@@ -1,0 +1,36 @@
+# censitas behind your own reverse proxy: put the proxy, its network and the public address in an
+# untracked compose.override.yaml next to this file. On its own, the web service listens on
+# loopback only.
+name: censitas
+services:
+  web:
+    container_name: censitas
+    build:
+      context: .
+      target: web
+      additional_contexts:
+        aequitas: ${AEQUITAS_DIST:-../aequitas/dist}
+    environment:
+      CENSITAS_DATA_DIR: /data
+      CENSITAS_SITES: /config/sites.json
+      CENSITAS_USER: ${CENSITAS_USER:-owner}
+      CENSITAS_PASSWORD: ${CENSITAS_PASSWORD:?Set a dashboard password of at least 12 characters}
+    ports:
+      - ${CENSITAS_BIND:-127.0.0.1:3100}:3000
+    volumes:
+      - censitas-data:/data
+      - ${CENSITAS_SITES_FILE:-./sites.json}:/config/sites.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  censitas-data:
