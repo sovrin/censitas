@@ -60,6 +60,22 @@ export const siteConfigSchema = z
   .strict()
 export type SiteConfig = z.infer<typeof siteConfigSchema>
 
+/** A file of sites, as the dashboard exports and imports them: settings only, never counts. */
+export const sitesFileSchema = z
+  .object({
+    censitas: z.literal(1, 'This is not a censitas sites file.'),
+    sites: z
+      .array(siteConfigSchema)
+      .min(1, 'The file holds no sites.')
+      .max(100)
+      .refine(
+        (sites) => new Set(sites.map((site) => site.id)).size === sites.length,
+        'Each site once.',
+      ),
+  })
+  .strict()
+export type SitesFile = z.infer<typeof sitesFileSchema>
+
 /** What track.js sends. Names, props and values are checked against the site afterwards. */
 export const beaconSchema = z
   .object({

@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { siteConfigSchema, type SiteConfig } from '../../shared/contracts'
+import { siteConfigSchema, sitesFileSchema, type SiteConfig } from '../../shared/contracts'
 import { countEvent, countToday, siteReport, siteSummaries } from '../../server/core/counts'
 import { openDatabase } from '../../server/core/database'
 import { createLimiter, isBot, senderNetwork } from '../../server/core/limits'
@@ -12,6 +12,7 @@ import {
   createSite,
   deleteSite,
   getSite,
+  importSites,
   listSites,
   updateSite,
 } from '../../server/core/sites'
@@ -75,6 +76,35 @@ describe('site settings', () => {
     expect(deleteSite(db, 'sonotas')).toBe(true)
     expect(getSite(db, 'sonotas')).toBeNull()
     expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
+  })
+})
+
+describe('sites files', () => {
+  it('import new sites and replace existing settings, keeping counts', () => {
+    const db = database()
+    createSite(db, sonotas)
+    countEvent(db, 'sonotas', 'pageview', {}, NOW)
+    const changed = { ...sonotas, events: { pageview: {}, 'link-copy': {} } }
+    const other = { ...sonotas, id: 'other' }
+    expect(importSites(db, [changed, other])).toEqual({ added: ['other'], replaced: ['sonotas'] })
+    expect(listSites(db)).toEqual([other, changed])
+    expect(countToday(db, NOW)).toBe(1)
+  })
+
+  it('are refused without the marker, empty or with a site twice', () => {
+    const file = (sites: unknown, censitas: unknown = 1) =>
+      sitesFileSchema.safeParse({ censitas, sites }).success
+    expect(file([sonotas])).toBe(true)
+    expect(file([sonotas], 2)).toBe(false)
+    expect(file([])).toBe(false)
+    expect(file([sonotas, sonotas])).toBe(false)
+  })
+
+  it('include a valid example for sonotas', () => {
+    const example = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../examples/sonotas.json'), 'utf8'),
+    )
+    expect(sitesFileSchema.safeParse(example).success).toBe(true)
   })
 })
 

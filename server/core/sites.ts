@@ -54,6 +54,22 @@ export function deleteSite(db: DatabaseSync, id: string) {
   })
 }
 
+/** Adds the sites that are new and replaces the settings of those that exist, all or none.
+ *  Counts stay as they are. */
+export function importSites(db: DatabaseSync, sites: SiteConfig[], now = Date.now()) {
+  return transaction(db, () => {
+    const added: string[] = []
+    const replaced: string[] = []
+    for (const site of sites)
+      if (createSite(db, site, now)) added.push(site.id)
+      else {
+        updateSite(db, site.id, site, now)
+        replaced.push(site.id)
+      }
+    return { added, replaced }
+  })
+}
+
 /** What gets counted once a beacon has passed every rule. */
 export interface Accepted {
   site: string
