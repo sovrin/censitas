@@ -9,9 +9,12 @@ const days = computed(() =>
 )
 useHead({ title: () => `${id.value} · censitas` })
 
-const { data, error, refresh } = await useFetch<SiteReport>(() => `/api/sites/${id.value}/report`, {
-  query: { days },
-})
+const { data, error, refresh, status } = await useFetch<SiteReport>(
+  () => `/api/sites/${id.value}/report`,
+  {
+    query: { days },
+  },
+)
 
 const counted = computed(() => data.value?.events.filter((event) => event.total) ?? [])
 /** Page views lead with the large chart; every other event follows with its own. */
@@ -87,7 +90,11 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       Nothing counted in the last {{ days }} days. The tracker to put in the site is under
       <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>.
     </p>
-    <template v-if="data && counted.length">
+    <div
+      v-if="data && counted.length"
+      class="refetch stack gap-6"
+      :data-pending="status === 'pending' || undefined"
+    >
       <!-- The figures of the range, each against the same number of days before it. -->
       <div class="headline hairline-b pb-5">
         <div v-for="event in headline" :key="event.name" class="stat">
@@ -154,7 +161,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
                 <span class="stack gap-1">
                   {{ value.value }}
                   <span class="share" aria-hidden="true"
-                    ><span :style="{ inlineSize: percent(share(value.count, event.total)) }"></span
+                    ><span :style="{ '--value': share(value.count, event.total) }"></span
                   ></span>
                 </span>
               </th>
@@ -168,7 +175,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           </tbody>
         </table>
       </section>
-    </template>
+    </div>
 
     <!-- Refused beacons mean the site sends something its settings don't list: those events are
          lost until the settings catch up. Only the reason is known; what was sent is never kept. -->

@@ -108,7 +108,10 @@ const label = computed(
           :data-today="index === count - 1 || undefined"
           aria-hidden="true"
         >
-          <span class="chart-bar" :style="{ blockSize: `${(item.count / top) * 100}%` }"></span>
+          <span
+            class="chart-bar"
+            :style="{ '--value': item.count / top, '--at': index / count }"
+          ></span>
         </span>
         <div v-if="readout" class="chart-readout" :style="readout.style" aria-live="polite">
           <b class="tabular">{{ readout.value }}</b>

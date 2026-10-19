@@ -7,6 +7,8 @@
    person could type into a terminal (site ids, origins, event names, prop values, days) is mono. */
 
 :root {
+  /* For rows making room on screen; aequitas has no ease-in-out of its own. */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   /* Cool slate greys behind the text, colour still reserved for state. */
   --ae-neutral-hue: 250;
   /* 14px: a small tool, not a dashboard. Every aequitas type step scales from this; any smaller and
@@ -152,16 +154,24 @@ button.link[data-quiet] {
   min-inline-size: 0;
 }
 
-/* Thin even with few days: never wider than step 5. */
+/* Thin even with few days: never wider than step 5. A column is scaled to its value rather than
+   sized, so a new range moves each one from where it stood to where it now belongs, in a short
+   wave from the left; a column that wasn't there rises from the baseline. */
 .chart-bar {
   inline-size: 100%;
   max-inline-size: var(--ae-space-5);
+  block-size: 100%;
   background: var(--ae-text-muted);
-  border-start-start-radius: var(--ae-radius-s);
-  border-start-end-radius: var(--ae-radius-s);
+  transform: scaleY(var(--value));
+  transform-origin: bottom;
   transition:
+    transform var(--ae-duration) var(--ae-ease) calc(var(--at) * var(--ae-duration-fast)),
     background-color var(--ae-duration-fast) ease,
     opacity var(--ae-duration-fast) ease;
+
+  @starting-style {
+    transform: scaleY(0);
+  }
 
   /* Today is not over: its column is lighter until it is. */
   [data-today] > & {
@@ -184,6 +194,13 @@ button.link[data-quiet] {
   font-size: var(--ae-text-s);
   white-space: nowrap;
   pointer-events: none;
+  /* It fades in when the pointer arrives and then jumps from day to day: following the pointer
+     must not lag behind it. */
+  transition: opacity var(--ae-duration-fast) var(--ae-ease);
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .chart-dates {
@@ -195,6 +212,47 @@ button.link[data-quiet] {
   > span {
     position: absolute;
     white-space: nowrap;
+  }
+}
+
+/* While another range loads, the page keeps what it showed, dimmed, instead of going blank. */
+.refetch {
+  transition: opacity var(--ae-duration-fast) ease;
+
+  &[data-pending] {
+    opacity: 0.5;
+  }
+}
+
+/* Rows added to a form drop in from just above; the rows below make room; one removed fades out
+   of its place. Its list is .relative for that. As in collatas. */
+.row-enter-active {
+  transition:
+    opacity var(--ae-duration) var(--ae-ease),
+    transform var(--ae-duration) var(--ae-ease);
+}
+.row-enter-from {
+  opacity: 0;
+  transform: translateY(-30%);
+}
+.row-leave-active {
+  position: absolute;
+  inset-inline: 0;
+  transition: opacity var(--ae-duration-fast) var(--ae-ease);
+}
+.row-leave-to {
+  opacity: 0;
+}
+.row-move {
+  transition: transform var(--ae-duration) var(--ease-in-out);
+}
+
+/* An alert that appears (saved, imported, could not load) fades in where it stands. */
+.alert {
+  transition: opacity var(--ae-duration) var(--ae-ease);
+
+  @starting-style {
+    opacity: 0;
   }
 }
 
@@ -212,10 +270,18 @@ button.link[data-quiet] {
   block-size: var(--ae-space-1);
   background: var(--ae-border);
 
+  /* Scaled like the chart's columns, so a new range moves it from its old share. */
   > span {
     display: block;
     block-size: 100%;
     background: var(--ae-text-muted);
+    transform: scaleX(var(--value));
+    transform-origin: left;
+    transition: transform var(--ae-duration) var(--ae-ease);
+
+    @starting-style {
+      transform: scaleX(0);
+    }
   }
 }
 

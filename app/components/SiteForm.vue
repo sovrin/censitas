@@ -7,21 +7,34 @@ import { errorMessage } from '~/lib/format'
 const props = defineProps<{ site?: SiteConfig }>()
 const emit = defineEmits<{ saved: [SiteConfig] }>()
 
-interface EventDraft {
-  name: string
-  props: { key: string; values: string }[]
+interface PropDraft {
+  uid: number
+  key: string
+  values: string
 }
+interface EventDraft {
+  uid: number
+  name: string
+  props: PropDraft[]
+}
+
+// Each row keeps one key for its life, so adding or removing a row animates that row, not the last.
+let uids = 0
+const newProp = (key = '', values = ''): PropDraft => ({ uid: ++uids, key, values })
+const newEvent = (name = '', props: PropDraft[] = []): EventDraft => ({ uid: ++uids, name, props })
 
 const id = ref(props.site?.id ?? '')
 const origins = ref(props.site?.origins.join('\n') ?? '')
 const events = ref<EventDraft[]>(
   props.site
-    ? Object.entries(props.site.events).map(([name, rules]) => ({
-        name,
-        props: Object.entries(rules).map(([key, values]) => ({ key, values: values.join(' ') })),
-      }))
+    ? Object.entries(props.site.events).map(([name, rules]) =>
+        newEvent(
+          name,
+          Object.entries(rules).map(([key, values]) => newProp(key, values.join(' '))),
+        ),
+      )
     : // The tracker counts a page view on import, so every site starts with it.
-      [{ name: 'pageview', props: [] }],
+      [newEvent('pageview')],
 )
 
 const pending = ref(false)
@@ -137,93 +150,98 @@ async function save() {
             exists.</small
           >
         </div>
-        <div
-          v-for="(event, index) in events"
-          :key="index"
-          class="stack gap-2"
-          role="group"
-          :aria-label="`Event ${index + 1}`"
-        >
-          <div class="cluster gap-3 flex-nowrap">
-            <input
-              v-model="event.name"
-              class="input font-mono text-s flex-1 min-w-0"
-              data-size="s"
-              :aria-label="`Event ${index + 1}: name`"
-              placeholder="export-start"
-              required
-              spellcheck="false"
-              :aria-invalid="!!fieldError(`events.${event.name.trim()}`) || undefined"
-            />
-            <button
-              type="button"
-              class="btn"
-              data-icon
-              data-size="s"
-              data-variant="ghost"
-              :aria-label="`Remove event ${event.name || index + 1}`"
-              data-tip="Remove"
-              @click="events.splice(index, 1)"
-            >
-              <i class="icon" data-icon="x"></i>
-            </button>
-          </div>
+        <!-- Rows ease in where they are added and out where removed; the rest make room. -->
+        <TransitionGroup name="row" tag="div" class="stack gap-4 relative">
           <div
-            v-for="(prop, propIndex) in event.props"
-            :key="propIndex"
-            class="cluster gap-3 flex-nowrap ps-5"
+            v-for="(event, index) in events"
+            :key="event.uid"
+            class="stack gap-2"
+            role="group"
+            :aria-label="`Event ${index + 1}`"
           >
-            <input
-              v-model="prop.key"
-              class="input font-mono text-s"
-              data-size="s"
-              :aria-label="`${event.name || `Event ${index + 1}`}: prop ${propIndex + 1}`"
-              placeholder="resolution"
-              required
-              spellcheck="false"
-              style="inline-size: 8rem"
-              :aria-invalid="
-                !!fieldError(`events.${event.name.trim()}.${prop.key.trim()}`) || undefined
-              "
-            />
-            <input
-              v-model="prop.values"
-              class="input font-mono text-s flex-1 min-w-0"
-              data-size="s"
-              :aria-label="`${prop.key || `Prop ${propIndex + 1}`}: values`"
-              placeholder="720p 1080p 2160p"
-              required
-              spellcheck="false"
-            />
-            <button
-              type="button"
-              class="btn"
-              data-icon
-              data-size="s"
-              data-variant="ghost"
-              :aria-label="`Remove prop ${prop.key || propIndex + 1}`"
-              data-tip="Remove"
-              @click="event.props.splice(propIndex, 1)"
-            >
-              <i class="icon" data-icon="x"></i>
-            </button>
+            <div class="cluster gap-3 flex-nowrap">
+              <input
+                v-model="event.name"
+                class="input font-mono text-s flex-1 min-w-0"
+                data-size="s"
+                :aria-label="`Event ${index + 1}: name`"
+                placeholder="export-start"
+                required
+                spellcheck="false"
+                :aria-invalid="!!fieldError(`events.${event.name.trim()}`) || undefined"
+              />
+              <button
+                type="button"
+                class="btn"
+                data-icon
+                data-size="s"
+                data-variant="ghost"
+                :aria-label="`Remove event ${event.name || index + 1}`"
+                data-tip="Remove"
+                @click="events.splice(index, 1)"
+              >
+                <i class="icon" data-icon="x"></i>
+              </button>
+            </div>
+            <TransitionGroup name="row" tag="div" class="stack gap-2 relative">
+              <div
+                v-for="(prop, propIndex) in event.props"
+                :key="prop.uid"
+                class="cluster gap-3 flex-nowrap ps-5"
+              >
+                <input
+                  v-model="prop.key"
+                  class="input font-mono text-s"
+                  data-size="s"
+                  :aria-label="`${event.name || `Event ${index + 1}`}: prop ${propIndex + 1}`"
+                  placeholder="resolution"
+                  required
+                  spellcheck="false"
+                  style="inline-size: 8rem"
+                  :aria-invalid="
+                    !!fieldError(`events.${event.name.trim()}.${prop.key.trim()}`) || undefined
+                  "
+                />
+                <input
+                  v-model="prop.values"
+                  class="input font-mono text-s flex-1 min-w-0"
+                  data-size="s"
+                  :aria-label="`${prop.key || `Prop ${propIndex + 1}`}: values`"
+                  placeholder="720p 1080p 2160p"
+                  required
+                  spellcheck="false"
+                />
+                <button
+                  type="button"
+                  class="btn"
+                  data-icon
+                  data-size="s"
+                  data-variant="ghost"
+                  :aria-label="`Remove prop ${prop.key || propIndex + 1}`"
+                  data-tip="Remove"
+                  @click="event.props.splice(propIndex, 1)"
+                >
+                  <i class="icon" data-icon="x"></i>
+                </button>
+              </div>
+            </TransitionGroup>
+            <p class="ps-5">
+              <button
+                type="button"
+                class="link text-s"
+                data-quiet
+                @click="event.props.push(newProp())"
+              >
+                Add a prop
+              </button>
+            </p>
           </div>
-          <p class="ps-5">
-            <button
-              type="button"
-              class="link text-s"
-              data-quiet
-              @click="event.props.push({ key: '', values: '' })"
-            >
-              Add a prop
-            </button>
-          </p>
-        </div>
+        </TransitionGroup>
         <span v-if="fieldError('events') && !events.length" class="text-s text-danger">{{
           fieldError('events')
         }}</span>
         <p>
-          <button type="button" class="link text-s" @click="events.push({ name: '', props: [] })">
+          <button type="button" class="link text-s" @click="events.push(newEvent())">
             Add an event
           </button>
         </p>
