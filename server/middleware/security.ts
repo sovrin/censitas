@@ -5,7 +5,14 @@ import { censitasOrigin } from '../utils/censitas'
 // Two kinds of API live here. /api/* is the dashboard's: the owner's session, and for writes the
 // exact CENSITAS_ORIGIN. /v1/* is public on purpose: sites load the tracker and send beacons.
 // Pages themselves hold no data; the auth middleware in app/ sends a visitor to sign in.
-const OPEN_API = /^\/api\/(health|auth\/.+)$/
+// Exact paths, never a prefix: /api/auth/../sites must not pass as open because it starts right.
+const OPEN_API = new Set([
+  '/api/health',
+  '/api/auth/status',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/setup',
+])
 // A beacon is well under 1 kB, a site's settings a few kB. Checked here, not left to whichever
 // proxy is in front.
 const MAX_BEACON = 4 * 1024
@@ -41,7 +48,7 @@ export default defineEventHandler((event) => {
     if (!getHeader(event, 'content-type')?.startsWith('application/json'))
       throw createError({ statusCode: 415, statusMessage: 'Send application/json.' })
   }
-  if (!OPEN_API.test(path)) requireOwner(event)
+  if (!OPEN_API.has(path)) requireOwner(event)
 })
 
 /** A body must announce its length, and stay under `max`. Browsers always send the length for
