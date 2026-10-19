@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { RANGES, type SiteReport } from '#shared/contracts'
-import { errorMessage, formatCount, formatDelta } from '~/lib/format'
+import { RANGES, REFUSALS, type Refusal, type SiteReport } from '#shared/contracts'
+import { errorMessage, formatCount, formatDay, formatDelta } from '~/lib/format'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -22,6 +22,20 @@ const headline = computed(() => [
   ...(views.value ? [views.value] : []),
   ...others.value.toSorted((a, b) => b.total - a.total).slice(0, views.value ? 3 : 4),
 ])
+/** What each refusal means, and where in the settings to look. */
+const REFUSAL_LABELS: Record<Refusal, string> = {
+  origin: 'from an origin not listed',
+  event: 'with an event not listed',
+  prop: 'with a prop not listed for its event',
+  value: 'with a value not listed for its prop',
+}
+const refusals = computed(() =>
+  REFUSALS.filter((reason) => data.value?.refused.reasons[reason]).map((reason) => ({
+    reason,
+    count: data.value!.refused.reasons[reason],
+    label: REFUSAL_LABELS[reason],
+  })),
+)
 const share = (count: number, total: number) => (total ? count / total : 0)
 const percent = (value: number) => `${Math.round(value * 100)}%`
 </script>
@@ -58,6 +72,27 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       </span>
     </header>
 
+    <!-- Refused beacons mean the site sends something its settings don't list: those events are
+         lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
+    <div v-if="data?.refused.total" class="alert" data-tone="warning" role="status">
+      <div class="stack gap-2">
+        <p>
+          <strong
+            >{{ formatCount(data.refused.total) }}
+            {{ data.refused.total === 1 ? 'event' : 'events' }} refused</strong
+          >
+          in the last {{ days }} days, the latest on {{ formatDay(data.refused.latest!) }}. The site
+          sends something its
+          <NuxtLink :to="`/sites/${id}/settings`" class="link">settings</NuxtLink> don't list, and
+          those events aren't counted.
+        </p>
+        <ul class="text-s">
+          <li v-for="refusal in refusals" :key="refusal.reason">
+            <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
+          </li>
+        </ul>
+      </div>
+    </div>
     <div v-if="error" class="alert" data-tone="danger" role="alert">
       <div><strong>Could not load this site.</strong> {{ errorMessage(error) }}</div>
       <button type="button" class="btn" data-size="s" @click="refresh()">Try again</button>
@@ -66,7 +101,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       Nothing counted in the last {{ days }} days. The tracker to put in the site is under
       <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>.
     </p>
-    <template v-else-if="data">
+    <template v-if="data && counted.length">
       <!-- The figures of the range, each against the same number of days before it. -->
       <div class="headline hairline-b pb-5">
         <div v-for="event in headline" :key="event.name" class="stat">

@@ -4,7 +4,13 @@ import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { siteConfigSchema, sitesFileSchema, type SiteConfig } from '../../shared/contracts'
-import { countEvent, countToday, siteReport, siteSummaries } from '../../server/core/counts'
+import {
+  countEvent,
+  countRefusal,
+  countToday,
+  siteReport,
+  siteSummaries,
+} from '../../server/core/counts'
 import { openDatabase } from '../../server/core/database'
 import { createLimiter, isBot, senderNetwork } from '../../server/core/limits'
 import {
@@ -155,6 +161,36 @@ describe('beacons', () => {
       status: 400,
     })
     expect(beacon({ site: 'sonotas', event: 'x'.repeat(41) })).toMatchObject({ status: 400 })
+  })
+})
+
+describe('refusals', () => {
+  it('name a fixed reason for a configured site, and none for an unknown one', () => {
+    const reason = (body: object, origin?: string) =>
+      (beacon(body, origin) as { refusal?: { reason: string } }).refusal?.reason
+    expect(reason({ site: 'sonotas', event: 'pageview' }, 'https://evil.example')).toBe('origin')
+    expect(reason({ site: 'sonotas', event: 'signup' })).toBe('event')
+    expect(reason({ site: 'sonotas', event: 'load', props: { file: 'demo' } })).toBe('prop')
+    expect(reason({ site: 'sonotas', event: 'load', props: { source: 'url' } })).toBe('value')
+    expect(beacon({ site: 'other', event: 'pageview' })).not.toHaveProperty('refusal')
+    expect(acceptBeacon(findSite, ORIGIN, 'not json')).not.toHaveProperty('refusal')
+  })
+
+  it('are counted per day and reason, reported over the range, and go with their site', () => {
+    const db = database()
+    createSite(db, sonotas)
+    countRefusal(db, 'sonotas', 'value', NOW)
+    countRefusal(db, 'sonotas', 'value', NOW - DAY)
+    countRefusal(db, 'sonotas', 'event', NOW - 2 * DAY)
+    countRefusal(db, 'sonotas', 'origin', NOW - 40 * DAY)
+    expect(siteReport(db, sonotas, 7, NOW).refused).toEqual({
+      total: 3,
+      reasons: { origin: 0, event: 1, prop: 0, value: 2 },
+      latest: '2026-10-19',
+    })
+    expect(siteSummaries(db, [sonotas], NOW)[0]!.refused).toBe(3)
+    deleteSite(db, 'sonotas')
+    expect(db.prepare('SELECT * FROM refusals').all()).toEqual([])
   })
 })
 

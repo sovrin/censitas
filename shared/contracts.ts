@@ -86,6 +86,10 @@ export const beaconSchema = z
   .strict()
 export type Beacon = z.infer<typeof beaconSchema>
 
+/** Why a configured site's beacon was refused. Fixed words only: what was sent is never kept. */
+export const REFUSALS = ['origin', 'event', 'prop', 'value'] as const
+export type Refusal = (typeof REFUSALS)[number]
+
 /** The ranges the dashboard offers, in days. */
 export const RANGES = [7, 30, 90] as const
 
@@ -100,6 +104,8 @@ export interface SiteSummary {
   previousPageviews: number
   /** Page views per day over the last 30 days, oldest first. */
   trend: number[]
+  /** Beacons refused in the last 30 days. */
+  refused: number
 }
 
 export interface EventReport {
@@ -116,6 +122,9 @@ export interface EventReport {
 export interface SiteReport {
   id: string
   origins: string[]
+  /** Beacons the site sent in the range that its settings refused, by reason, and the last day
+   *  one was. */
+  refused: { total: number; reasons: Record<Refusal, number>; latest: string | null }
   /** Every day of the range, newest first. */
   days: string[]
   events: EventReport[]

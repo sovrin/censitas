@@ -1,4 +1,4 @@
-import { countEvent } from '../../core/counts'
+import { countEvent, countRefusal } from '../../core/counts'
 import { createLimiter, isBot } from '../../core/limits'
 import { acceptBeacon, getSite } from '../../core/sites'
 import { censitasDatabase, requestSender } from '../../utils/censitas'
@@ -18,10 +18,14 @@ export default defineEventHandler(async (event) => {
     getHeader(event, 'origin'),
     (await readRawBody(event, 'utf8')) ?? '',
   )
-  if ('error' in accepted)
-    throw createError({ statusCode: accepted.status, statusMessage: accepted.error })
-  if (!perSender.hit(requestSender(event)))
+  // Only a beacon for a configured site counts against its sender, and a sender out of beacons
+  // can raise no counter at all, refused ones included.
+  if (('error' in accepted ? accepted.refusal : accepted) && !perSender.hit(requestSender(event)))
     throw createError({ statusCode: 429, statusMessage: 'Too many events. Try again later.' })
+  if ('error' in accepted) {
+    if (accepted.refusal) countRefusal(db, accepted.refusal.site, accepted.refusal.reason)
+    throw createError({ statusCode: accepted.status, statusMessage: accepted.error })
+  }
   countEvent(db, accepted.site, accepted.event, accepted.props)
   return null
 })

@@ -1,6 +1,13 @@
 // The counters: one row per site, UTC day, event and prop value, holding how often it happened.
 import type { DatabaseSync } from 'node:sqlite'
-import type { EventReport, SiteConfig, SiteReport, SiteSummary } from '../../shared/contracts'
+import {
+  REFUSALS,
+  type EventReport,
+  type Refusal,
+  type SiteConfig,
+  type SiteReport,
+  type SiteSummary,
+} from '../../shared/contracts'
 import { transaction } from './database'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -28,6 +35,31 @@ export function countEvent(
     add.run(site, day, event, '', '')
     for (const [prop, value] of Object.entries(props)) add.run(site, day, event, prop, value)
   })
+}
+
+/** Counts one beacon a configured site sent and its settings refused, by its reason only. */
+export function countRefusal(db: DatabaseSync, site: string, reason: Refusal, now = Date.now()) {
+  db.prepare(
+    `INSERT INTO refusals (site, day, reason, count) VALUES (?, ?, ?, 1)
+    ON CONFLICT DO UPDATE SET count = count + 1`,
+  ).run(site, dayOf(now), reason)
+}
+
+/** A site's refusals since `day`: how many by reason, and the last day there were any. */
+function refusalsSince(db: DatabaseSync, site: string, day: string) {
+  const rows = db
+    .prepare('SELECT day, reason, count FROM refusals WHERE site = ? AND day >= ?')
+    .all(site, day) as { day: string; reason: Refusal; count: number }[]
+  const reasons = Object.fromEntries(REFUSALS.map((reason) => [reason, 0])) as Record<
+    Refusal,
+    number
+  >
+  let latest: string | null = null
+  for (const row of rows) {
+    reasons[row.reason] += row.count
+    if (!latest || row.day > latest) latest = row.day
+  }
+  return { total: rows.reduce((sum, row) => sum + row.count, 0), reasons, latest }
 }
 
 /** Every site with what it counted in the last 30 days, the 30 before, and page views per day. */
@@ -63,6 +95,7 @@ export function siteSummaries(
         previousPageviews: number
       }),
       trend: days.map((day) => counts.get(day) ?? 0),
+      refused: refusalsSince(db, site.id, days[0]!).total,
     }
   })
 }
@@ -137,6 +170,7 @@ export function siteReport(
   return {
     id: site.id,
     origins: site.origins,
+    refused: refusalsSince(db, site.id, start),
     days: Array.from({ length: days }, (_, i) => dayOf(now - i * DAY)),
     events: [...events.values()],
   }

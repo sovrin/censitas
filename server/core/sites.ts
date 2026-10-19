@@ -1,6 +1,6 @@
 // The sites censitas counts for, and what each one may send.
 import type { DatabaseSync } from 'node:sqlite'
-import { beaconSchema, type SiteConfig } from '../../shared/contracts'
+import { beaconSchema, type Refusal, type SiteConfig } from '../../shared/contracts'
 import { transaction } from './database'
 
 interface SiteRow {
@@ -50,6 +50,7 @@ export function updateSite(db: DatabaseSync, id: string, site: SiteConfig, now =
 export function deleteSite(db: DatabaseSync, id: string) {
   return transaction(db, () => {
     db.prepare('DELETE FROM counts WHERE site = ?').run(id)
+    db.prepare('DELETE FROM refusals WHERE site = ?').run(id)
     return db.prepare('DELETE FROM sites WHERE id = ?').run(id).changes === 1
   })
 }
@@ -77,14 +78,21 @@ export interface Accepted {
   props: Record<string, string>
 }
 
-/** Checks a beacon's raw body against its site. Returns why it is refused, with a status, or
- *  what to count. Only names and values the site lists pass, so a forged beacon can at most add
+/** A beacon turned away: the status and message to answer with, and for a configured site, why
+ *  in one fixed word, to count. */
+export interface Refused {
+  status: number
+  error: string
+  refusal?: { site: string; reason: Refusal }
+}
+
+/** Checks a beacon's raw body against its site. Returns why it is refused, or what to count. Only names and values the site lists pass, so a forged beacon can at most add
  *  to a counter that exists already; it can never put new text in the database. */
 export function acceptBeacon(
   findSite: (id: string) => SiteConfig | null,
   origin: string | undefined,
   body: string,
-): { status: number; error: string } | Accepted {
+): Refused | Accepted {
   let json: unknown
   try {
     json = JSON.parse(body)
@@ -95,16 +103,23 @@ export function acceptBeacon(
   if (!beacon.success) return { status: 400, error: beacon.error.issues[0]!.message }
   const { site: id, event, props = {} } = beacon.data
   const site = findSite(id)
+  // A site that isn't configured has nothing to count against: the id itself is untrusted text.
+  if (!site) return { status: 403, error: 'This site may not send events here.' }
+  const refuse = (status: number, error: string, reason: Refusal): Refused => ({
+    status,
+    error,
+    refusal: { site: id, reason },
+  })
   // A browser always sends Origin on a cross-site beacon; anything else did not come from the site.
-  if (!site || !origin || !site.origins.includes(origin))
-    return { status: 403, error: 'This site may not send events here.' }
+  if (!origin || !site.origins.includes(origin))
+    return refuse(403, 'This site may not send events here.', 'origin')
   const rules = Object.hasOwn(site.events, event) ? site.events[event] : undefined
-  if (!rules) return { status: 400, error: `The event ${event} is not configured.` }
+  if (!rules) return refuse(400, `The event ${event} is not configured.`, 'event')
   for (const [key, value] of Object.entries(props)) {
     const values = Object.hasOwn(rules, key) ? rules[key] : undefined
-    if (!values) return { status: 400, error: `The prop ${key} is not configured for ${event}.` }
+    if (!values) return refuse(400, `The prop ${key} is not configured for ${event}.`, 'prop')
     if (!values.includes(value))
-      return { status: 400, error: `The value ${value} is not configured for ${key}.` }
+      return refuse(400, `The value ${value} is not configured for ${key}.`, 'value')
   }
   return { site: id, event, props }
 }

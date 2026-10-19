@@ -93,7 +93,7 @@ Sites are configured in the dashboard (Sites → Add a site), each with:
   lowercase with dashes, props letters and digits, values up to 40 of letters, digits and
   `. : + - _`.
 
-A change applies from the next beacon on. The site's settings page shows the snippet to put in it.
+A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals per site and day by reason (an origin, event, prop or value not listed), never what was sent. The site page warns about them and the sites list marks the site `refused`: update the settings when a release starts sending something new. A change applies from the next beacon on. The site's settings page shows the snippet to put in it.
 Deleting a site deletes its counts with it.
 
 **Import and export** (under the sites list) move settings, never counts, as one JSON file:

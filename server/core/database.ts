@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-const VERSION = 2
+const VERSION = 3
 
 export function openDatabase(dataDir: string) {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 })
@@ -32,6 +32,18 @@ export function openDatabase(dataDir: string) {
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
       PRAGMA user_version = 2;
+    `)
+    // Beacons a configured site sent but its settings refused, counted by a fixed reason only:
+    // what was sent is never kept, so a misconfiguration shows without storing anyone's text.
+    if (version < 3)
+      db.exec(`
+      CREATE TABLE refusals (
+        site TEXT NOT NULL, day TEXT NOT NULL,
+        reason TEXT NOT NULL CHECK (reason IN ('origin', 'event', 'prop', 'value')),
+        count INTEGER NOT NULL,
+        PRIMARY KEY (site, day, reason)
+      ) WITHOUT ROWID;
+      PRAGMA user_version = 3;
     `)
   })
   return db
