@@ -96,6 +96,24 @@ Sites are configured in the dashboard (Sites → Add a site), each with:
 A change applies from the next beacon on. The site's settings page shows the snippet to put in it.
 Deleting a site deletes its counts with it.
 
+**Import and export** (under the sites list) move settings, never counts, as one JSON file:
+
+```json
+{
+  "censitas": 1,
+  "sites": [
+    { "id": "sonotas", "origins": ["https://sonotas.example.com"], "events": { "pageview": {} } }
+  ]
+}
+```
+
+Import shows what it adds and which sites' settings it replaces before it changes anything; the
+replaced sites keep their counts. `examples/sonotas.json` is the full set for sonotas: opening a
+file by format, exports by their settings (aspect, resolution, fps, quality, fast export, layout,
+view, staves, theme, song length), how long a finished export took, failures, cancels, downloads
+and copied links. Send each value as the file lists it (`fps: '30'`, `layout: 'line'`), and bucket
+anything continuous, like the song length, before sending it.
+
 ## Abuse
 
 Beacons need a configured site, a matching `Origin` and listed names and values, and must state their
