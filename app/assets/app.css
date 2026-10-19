@@ -96,40 +96,60 @@ button.link[data-quiet] {
   animation-timing-function: var(--ae-ease);
 }
 
-/* A day chart: columns rising from a baseline to the scale's top, both hairlines, with the top
-   value just above its line at the start, like an axis, in a band of its own. aequitas has no chart, so it is drawn here; bars are ink, like the
-   text, since colour stays reserved for state. */
+/* A day chart: columns on a scale whose top, middle and baseline are hairlines, the scale in a
+   gutter at the start and dates under it. The band above the plot holds the readout of the day
+   pointed at. aequitas has no chart, so it is drawn here; columns are ink, like the text, since
+   colour stays reserved for state. */
 .chart {
-  position: relative;
-  block-size: var(--ae-space-8);
-  margin-block-start: var(--ae-space-4);
-  border-block: 1px solid var(--ae-border);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--ae-space-3);
+  padding-block-start: var(--ae-space-6);
 }
 
-.chart-top {
-  position: absolute;
-  inset-block-end: 100%;
-  inset-inline-start: 0;
+.chart-scale {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  /* Each value sits centred on its line rather than under it. */
+  margin-block: -0.5lh;
 }
 
-/* Each day is a full-height slot, so the hover target is the whole column, not the painted bar;
-   the gap keeps touching bars apart. */
 .chart-plot {
+  position: relative;
   display: flex;
   gap: var(--ae-space-0);
-  block-size: 100%;
+  block-size: var(--ae-space-8);
+  cursor: crosshair;
+
+  .chart[data-size='l'] & {
+    block-size: calc(var(--ae-space-8) * 1.618);
+  }
+
+  /* Past two months a column is a few pixels wide; the full gap would leave only gaps. */
+  .chart[data-dense] & {
+    gap: 1px;
+  }
 }
 
+.chart-grid {
+  position: absolute;
+  inset: 0;
+  border-block: 1px solid var(--ae-border);
+  background: linear-gradient(var(--ae-border), var(--ae-border)) center / 100% 1px no-repeat;
+  pointer-events: none;
+}
+
+/* Each day is a full-height slot: pointing anywhere in the column picks the day, and the gap keeps
+   touching columns apart. */
 .chart-slot {
+  position: relative;
   display: flex;
   flex: 1;
   align-items: flex-end;
   justify-content: center;
   min-inline-size: 0;
-
-  &:hover .chart-bar {
-    background: var(--ae-text);
-  }
 }
 
 /* Thin even with few days: never wider than step 5. */
@@ -139,5 +159,78 @@ button.link[data-quiet] {
   background: var(--ae-text-muted);
   border-start-start-radius: var(--ae-radius-s);
   border-start-end-radius: var(--ae-radius-s);
-  transition: background-color var(--ae-duration-fast) ease;
+  transition:
+    background-color var(--ae-duration-fast) ease,
+    opacity var(--ae-duration-fast) ease;
+
+  /* Today is not over: its column is lighter until it is. */
+  [data-today] > & {
+    opacity: 0.5;
+  }
+
+  [data-active] > & {
+    background: var(--ae-text);
+    opacity: 1;
+  }
+}
+
+.chart-readout {
+  position: absolute;
+  inset-block-end: 100%;
+  display: flex;
+  gap: var(--ae-space-2);
+  align-items: baseline;
+  margin-block-end: var(--ae-space-2);
+  font-size: var(--ae-text-s);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-dates {
+  position: relative;
+  grid-column: 2;
+  block-size: 1lh;
+  margin-block-start: var(--ae-space-2);
+
+  > span {
+    position: absolute;
+    white-space: nowrap;
+  }
+}
+
+/* The headline figures, two by two: aequitas' .stats divides one row with hairlines, which land
+   mid-grid once its four figures wrap in this narrow column. */
+.headline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ae-space-5) var(--ae-space-4);
+}
+
+/* A share of an event's total, drawn under its count: a thin ink bar on a hairline track. */
+.share {
+  display: block;
+  block-size: var(--ae-space-1);
+  background: var(--ae-border);
+
+  > span {
+    display: block;
+    block-size: 100%;
+    background: var(--ae-text-muted);
+  }
+}
+
+/* A site's page views over 30 days, small enough for its row. */
+.spark {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 1px;
+  inline-size: var(--ae-space-8);
+  block-size: var(--ae-space-5);
+  border-block-end: 1px solid var(--ae-border);
+
+  > span {
+    flex: 1;
+    background: var(--ae-text-muted);
+  }
 }

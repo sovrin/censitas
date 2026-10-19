@@ -96,11 +96,17 @@ export interface SiteSummary {
   events: number
   /** Of those, page views. */
   pageviews: number
+  /** Page views in the 30 days before, to compare with. */
+  previousPageviews: number
+  /** Page views per day over the last 30 days, oldest first. */
+  trend: number[]
 }
 
 export interface EventReport {
   name: string
   total: number
+  /** The total of the period of the same length just before, to compare with. */
+  previous: number
   /** Counts per UTC day (YYYY-MM-DD); days without any are left out. */
   daily: Record<string, number>
   /** Each prop with every value it was counted with, the configured ones included at 0. */
@@ -109,6 +115,7 @@ export interface EventReport {
 
 export interface SiteReport {
   id: string
+  origins: string[]
   /** Every day of the range, newest first. */
   days: string[]
   events: EventReport[]

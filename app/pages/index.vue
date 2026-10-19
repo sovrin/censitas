@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { sitesFileSchema, type SiteSummary, type SitesFile } from '#shared/contracts'
-import { errorMessage, formatCount } from '~/lib/format'
+import { errorMessage, formatCount, formatDelta } from '~/lib/format'
 useHead({ title: 'Sites · censitas' })
 const { data, error, refresh } = await useFetch<SiteSummary[]>('/api/sites')
 
@@ -118,20 +118,37 @@ const list = (ids: string[]) => ids.join(', ')
               data-quiet
               >{{ site.id }}</NuxtLink
             >
-            <span v-if="site.events" class="text-muted tabular"
-              >{{ formatCount(site.pageviews) }} views · {{ formatCount(site.events) }} events</span
+            <!-- Page views over the 30 days, scaled to the site's own busiest day. -->
+            <span v-if="site.events" class="spark" aria-hidden="true"
+              ><span
+                v-for="(value, index) in site.trend"
+                :key="index"
+                :style="{ blockSize: `${(value / Math.max(1, ...site.trend)) * 100}%` }"
+              ></span
+            ></span>
+            <span v-if="site.events" class="cluster gap-2 text-muted tabular"
+              >{{ formatCount(site.pageviews) }} views
+              <span
+                v-if="formatDelta(site.pageviews, site.previousPageviews)"
+                class="delta"
+                :data-trend="formatDelta(site.pageviews, site.previousPageviews)!.trend"
+                >{{ formatDelta(site.pageviews, site.previousPageviews)!.text }}</span
+              ></span
             >
             <span v-else class="text-muted">quiet</span>
           </div>
-          <p class="ps-4 font-mono text-xs text-muted break-words">
-            {{ site.origins.join(' · ') }}
+          <p class="ps-4 cluster justify-between gap-3 font-mono text-xs text-muted">
+            <span class="break-words min-w-0">{{ site.origins.join(' · ') }}</span>
+            <span v-if="site.events" class="tabular">{{ formatCount(site.events) }} events</span>
           </p>
         </li>
       </ul>
       <p v-else class="text-muted">
         No sites yet. Add one to get the tracker to put in it, or import a sites file.
       </p>
-      <p v-if="data.length" class="text-s text-muted">Counted over the last 30 days.</p>
+      <p v-if="data.length" class="text-s text-muted">
+        The last 30 days, each against the 30 before.
+      </p>
       <div class="cluster gap-4">
         <NuxtLink to="/sites/new" class="link">Add a site</NuxtLink>
         <span class="cluster gap-3 text-s end">

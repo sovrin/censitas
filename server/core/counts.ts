@@ -30,21 +30,41 @@ export function countEvent(
   })
 }
 
-/** Every site with what it counted in the last 30 days. */
+/** Every site with what it counted in the last 30 days, the 30 before, and page views per day. */
 export function siteSummaries(
   db: DatabaseSync,
   sites: SiteConfig[],
   now = Date.now(),
 ): SiteSummary[] {
   const totals = db.prepare(
-    `SELECT coalesce(sum(count), 0) AS events, coalesce(sum(count) FILTER (WHERE event = 'pageview'), 0) AS pageviews
-    FROM counts WHERE site = ? AND prop = '' AND day >= ?`,
+    `SELECT coalesce(sum(count) FILTER (WHERE day >= $since), 0) AS events,
+      coalesce(sum(count) FILTER (WHERE day >= $since AND event = 'pageview'), 0) AS pageviews,
+      coalesce(sum(count) FILTER (WHERE day < $since AND event = 'pageview'), 0) AS previousPageviews
+    FROM counts WHERE site = $site AND prop = '' AND day >= $before`,
   )
-  return sites.map((site) => ({
-    id: site.id,
-    origins: site.origins,
-    ...(totals.get(site.id, since(30, now)) as { events: number; pageviews: number }),
-  }))
+  const daily = db.prepare(
+    `SELECT day, count FROM counts
+    WHERE site = ? AND event = 'pageview' AND prop = '' AND day >= ?`,
+  )
+  const days = Array.from({ length: 30 }, (_, i) => dayOf(now - (29 - i) * DAY))
+  return sites.map((site) => {
+    const counts = new Map(
+      (daily.all(site.id, days[0]!) as { day: string; count: number }[]).map((row) => [
+        row.day,
+        row.count,
+      ]),
+    )
+    return {
+      id: site.id,
+      origins: site.origins,
+      ...(totals.get({ site: site.id, since: since(30, now), before: since(60, now) }) as {
+        events: number
+        pageviews: number
+        previousPageviews: number
+      }),
+      trend: days.map((day) => counts.get(day) ?? 0),
+    }
+  })
 }
 
 /** Every event counted today, across sites. */
@@ -56,8 +76,9 @@ export function countToday(db: DatabaseSync, now = Date.now()) {
   ).count
 }
 
-/** One site over the last `days` days: daily counts per event and the breakdown by prop value.
- *  Configured events come first in their order, then any counted since dropped from the config. */
+/** One site over the last `days` days: daily counts per event, the breakdown by prop value, and
+ *  each event's total over the `days` before, to compare with. Configured events come first in
+ *  their order, then any counted since dropped from the config. */
 export function siteReport(
   db: DatabaseSync,
   site: SiteConfig,
@@ -66,7 +87,7 @@ export function siteReport(
 ): SiteReport {
   const rows = db
     .prepare(`SELECT day, event, prop, value, count FROM counts WHERE site = ? AND day >= ?`)
-    .all(site.id, since(days, now)) as {
+    .all(site.id, since(2 * days, now)) as {
     day: string
     event: string
     prop: string
@@ -81,6 +102,7 @@ export function siteReport(
       entry = {
         name,
         total: 0,
+        previous: 0,
         daily: {},
         props: Object.entries(rules).map(([key, values]) => ({
           key,
@@ -92,8 +114,13 @@ export function siteReport(
     return entry
   }
   for (const name of Object.keys(site.events)) report(name)
+  const start = since(days, now)
   for (const row of rows) {
     const entry = report(row.event)
+    if (row.day < start) {
+      if (!row.prop) entry.previous += row.count
+      continue
+    }
     if (!row.prop) {
       entry.total += row.count
       entry.daily[row.day] = (entry.daily[row.day] ?? 0) + row.count
@@ -109,6 +136,7 @@ export function siteReport(
     for (const prop of entry.props) prop.values.sort((a, b) => b.count - a.count)
   return {
     id: site.id,
+    origins: site.origins,
     days: Array.from({ length: days }, (_, i) => dayOf(now - i * DAY)),
     events: [...events.values()],
   }

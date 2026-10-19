@@ -28,8 +28,9 @@ Conventions for working on censitas, in code and in the interface.
   `app/assets/app.css` holds only what aequitas lacks, with tokens only.
 - The look: one centred small column hanging from the top, compact density, square corners, no
   cards, panels or sidebar. Colour only reports state, always next to a word. Site ids, origins,
-  event names, props, values and days are mono. Daily counts are a column chart per event, each with
-  its table under it; breakdowns are tables. Text actions first, at most one primary button per
+  event names, props, values and days are mono. Daily counts are a column chart per event (page
+  views larger), each with its table under it; prop values are tables with a share bar; figures
+  compare with the period before as a .delta. Text actions first, at most one primary button per
   view.
 - Lint changed Vue files: `node ../aequitas/dist/aequitas-check.mjs --css app/assets/app.css <files>`.
 

@@ -188,9 +188,17 @@ describe('counters', () => {
       { site: 'sonotas', day: '2026-10-19', event: 'pageview', prop: '', value: '', count: 1 },
     ])
     expect(countToday(db, NOW)).toBe(3)
-    expect(siteSummaries(db, [sonotas], NOW)).toEqual([
-      { id: 'sonotas', origins: [ORIGIN], events: 4, pageviews: 1 },
-    ])
+    countEvent(db, 'sonotas', 'pageview', {}, NOW - 40 * DAY)
+    const [summary] = siteSummaries(db, [sonotas], NOW)
+    expect(summary).toMatchObject({
+      id: 'sonotas',
+      origins: [ORIGIN],
+      events: 4,
+      pageviews: 1,
+      previousPageviews: 1,
+    })
+    expect(summary!.trend).toHaveLength(30)
+    expect(summary!.trend.at(-1)).toBe(1)
   })
 
   it('report a range per day and by prop value, configured values at 0', () => {
@@ -202,9 +210,12 @@ describe('counters', () => {
     expect(report.days).toHaveLength(7)
     expect(report.days[0]).toBe('2026-10-19')
     expect(report.events.map((event) => event.name)).toEqual(['pageview', 'load'])
+    expect(report.origins).toEqual([ORIGIN])
     expect(report.events[1]).toEqual({
       name: 'load',
       total: 2,
+      // the demo load a week ago falls in the 7 days before
+      previous: 1,
       daily: { '2026-10-19': 1, '2026-10-18': 1 },
       props: [
         {
