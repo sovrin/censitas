@@ -3,6 +3,7 @@ import { sitesFileSchema, type SiteSummary, type SitesFile } from '#shared/contr
 import { errorMessage, formatCount, formatDelta } from '~/lib/format'
 useHead({ title: 'Sites · censitas' })
 const { data, error, refresh } = await useFetch<SiteSummary[]>('/api/sites')
+useLive(refresh)
 
 // Import: the file is read and checked here first, so the owner sees what it adds and replaces
 // before anything changes. The server checks it again.

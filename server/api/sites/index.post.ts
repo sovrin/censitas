@@ -1,6 +1,7 @@
 import { siteConfigSchema } from '#shared/contracts'
 import { createSite } from '../../core/sites'
 import { censitasDatabase } from '../../utils/censitas'
+import { announceChange } from '../../utils/changes'
 import { invalid } from '../../utils/invalid'
 
 export default defineEventHandler(async (event) => {
@@ -8,6 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!body.success) throw invalid(body.error)
   if (!createSite(censitasDatabase(), body.data))
     throw createError({ statusCode: 409, statusMessage: 'A site with this id exists already.' })
+  announceChange()
   setResponseStatus(event, 201)
   return body.data
 })

@@ -6,7 +6,8 @@ const { data, refresh } = useFetch<{ today: number; siteCount: number }>('/api/s
   server: false,
   lazy: true,
 })
-// Refresh on navigation, so the line never contradicts the page that just loaded.
+useLive(refresh)
+// Refresh on navigation too, so the line never contradicts the page that just loaded.
 const route = useRoute()
 watch(
   () => route.fullPath,

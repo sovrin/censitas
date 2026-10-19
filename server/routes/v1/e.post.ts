@@ -2,6 +2,7 @@ import { countEvent, countRefusal } from '../../core/counts'
 import { createLimiter, isBot } from '../../core/limits'
 import { acceptBeacon, getSite } from '../../core/sites'
 import { censitasDatabase, requestSender } from '../../utils/censitas'
+import { announceBeacon } from '../../utils/changes'
 
 // A visitor sends a page view and a handful of events; a script sending more is not one.
 const perSender = createLimiter(60, 60 * 1000)
@@ -23,9 +24,13 @@ export default defineEventHandler(async (event) => {
   if (('error' in accepted ? accepted.refusal : accepted) && !perSender.hit(requestSender(event)))
     throw createError({ statusCode: 429, statusMessage: 'Too many events. Try again later.' })
   if ('error' in accepted) {
-    if (accepted.refusal) countRefusal(db, accepted.refusal.site, accepted.refusal.reason)
+    if (accepted.refusal) {
+      countRefusal(db, accepted.refusal.site, accepted.refusal.reason)
+      announceBeacon()
+    }
     throw createError({ statusCode: accepted.status, statusMessage: accepted.error })
   }
   countEvent(db, accepted.site, accepted.event, accepted.props)
+  announceBeacon()
   return null
 })

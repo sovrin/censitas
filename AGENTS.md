@@ -22,6 +22,10 @@ Conventions for working on censitas, in code and in the interface.
   open. `/v1/*` is public and versioned: sites already out there load the tracker and send its
   beacons, so it only grows (new fields optional, nothing renamed or removed).
 
+- The dashboard is live: whatever changes what it shows calls `announceChange()` (settings) or
+  `announceBeacon()` (counts, paced to once per 3 s) from `server/utils/changes.ts`, and every view
+  that shows data passes its refresh to `useLive`.
+
 ## UI
 
 - Built only from aequitas: semantic HTML plus its classes, `data-*` variants and ARIA state.
