@@ -14,3 +14,7 @@ export function errorMessage(error: unknown) {
   const response = error as { data?: { statusMessage?: string } }
   return response?.data?.statusMessage || 'Could not reach censitas. Please try again.'
 }
+
+/** 60, 1.2K, 3M: an axis tick. */
+export const formatCompact = (value: number) =>
+  new Intl.NumberFormat('en-GB', { notation: 'compact' }).format(value)

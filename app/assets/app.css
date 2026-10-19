@@ -89,3 +89,49 @@ button.link[data-quiet] {
   animation-duration: var(--ae-duration-fast);
   animation-timing-function: var(--ae-ease);
 }
+
+/* A day chart: columns rising from a baseline to the scale's top, both hairlines, with the top
+   value just above its line at the start, like an axis, in a band of its own. aequitas has no chart, so it is drawn here; bars are ink, like the
+   text, since colour stays reserved for state. */
+.chart {
+  position: relative;
+  block-size: var(--ae-space-8);
+  margin-block-start: var(--ae-space-4);
+  border-block: 1px solid var(--ae-border);
+}
+
+.chart-top {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 0;
+}
+
+/* Each day is a full-height slot, so the hover target is the whole column, not the painted bar;
+   the gap keeps touching bars apart. */
+.chart-plot {
+  display: flex;
+  gap: var(--ae-space-0);
+  block-size: 100%;
+}
+
+.chart-slot {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  min-inline-size: 0;
+
+  &:hover .chart-bar {
+    background: var(--ae-text);
+  }
+}
+
+/* Thin even with few days: never wider than step 5. */
+.chart-bar {
+  inline-size: 100%;
+  max-inline-size: var(--ae-space-5);
+  background: var(--ae-text-muted);
+  border-start-start-radius: var(--ae-radius-s);
+  border-start-end-radius: var(--ae-radius-s);
+  transition: background-color var(--ae-duration-fast) ease;
+}

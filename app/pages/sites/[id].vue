@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RANGES, type SiteReport } from '#shared/contracts'
-import { errorMessage, formatCount, formatDay } from '~/lib/format'
+import { errorMessage, formatCount } from '~/lib/format'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -14,8 +14,6 @@ const { data, error, refresh } = await useFetch<SiteReport>(() => `/api/sites/${
 })
 
 const counted = computed(() => data.value?.events.filter((event) => event.total) ?? [])
-/** The events that carry props, for the breakdown. */
-const broken = computed(() => counted.value.filter((event) => event.props.length))
 const share = (count: number, total: number) =>
   total ? `${Math.round((count / total) * 100)}%` : '—'
 </script>
@@ -51,49 +49,10 @@ const share = (count: number, total: number) =>
       Nothing counted in the last {{ days }} days.
     </p>
     <template v-else-if="data">
-      <section class="stack gap-3" aria-labelledby="daily">
-        <h2 id="daily" class="text-s weight-600">Per day</h2>
-        <div class="table-scroll" tabindex="0" aria-label="Events per day">
-          <table class="table" data-size="s" data-hover="false">
-            <thead>
-              <tr>
-                <th scope="col">Day (UTC)</th>
-                <th v-for="event in counted" :key="event.name" scope="col" data-num>
-                  <span class="font-mono nowrap">{{ event.name }}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="day in data.days" :key="day">
-                <th scope="row" class="font-mono weight-400 text-muted nowrap">
-                  <time :datetime="day">{{ formatDay(day, true) }}</time>
-                </th>
-                <td
-                  v-for="event in counted"
-                  :key="event.name"
-                  data-num
-                  :class="event.daily[day] ? undefined : 'text-muted'"
-                >
-                  {{ formatCount(event.daily[day] ?? 0) }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <th scope="row">Total</th>
-                <td v-for="event in counted" :key="event.name" data-num class="weight-600">
-                  {{ formatCount(event.total) }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
-
       <section
-        v-for="event in broken"
+        v-for="event in counted"
         :key="event.name"
-        class="stack gap-3"
+        class="stack gap-4"
         :aria-labelledby="`event-${event.name}`"
       >
         <div class="cluster justify-between gap-4">
@@ -102,6 +61,7 @@ const share = (count: number, total: number) =>
           </h2>
           <span class="text-s text-muted tabular">{{ formatCount(event.total) }} in all</span>
         </div>
+        <DailyChart :name="event.name" :days="data.days" :daily="event.daily" />
         <table
           v-for="prop in event.props"
           :key="prop.key"
