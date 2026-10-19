@@ -1,0 +1,27 @@
+{
+  "sonotas": {
+    "origins": ["https://sonotas.sovrin.de", "http://localhost:3000"],
+    "events": {
+      "pageview": {},
+      "load": {
+        "source": ["demo", "file"],
+        "format": ["gp", "gpx", "gp5", "gp4", "gp3", "musicxml"]
+      },
+      "export-start": {
+        "resolution": ["720p", "1080p", "1440p", "2160p"],
+        "duration": ["0-1min", "1-3min", "3-5min", "5min+"],
+        "theme": ["light", "dark"],
+        "scroll": ["page", "continuous"]
+      },
+      "export-done": {
+        "resolution": ["720p", "1080p", "1440p", "2160p"],
+        "duration": ["0-1min", "1-3min", "3-5min", "5min+"]
+      },
+      "export-fail": {
+        "resolution": ["720p", "1080p", "1440p", "2160p"]
+      },
+      "track-switch": {},
+      "link-copy": {}
+    }
+  }
+}
