@@ -23,6 +23,9 @@ export default defineEventHandler((event) => {
     "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   )
   const path = event.path.split('?')[0]!
+  // Nuxt renders an error as a page unless the request asks for JSON, and the page's sign-in
+  // redirect would answer a refused beacon with a 302. A beacon's answer is JSON.
+  if (path === '/v1/e') event.node.req.headers.accept = 'application/json'
   const reads = ['GET', 'HEAD', 'OPTIONS'].includes(event.method)
   if (!reads) limitBody(event, path === '/v1/e' ? MAX_BEACON : MAX_BODY)
   if (path === '/v1/e') setHeader(event, 'Cache-Control', 'no-store')
