@@ -1,0 +1,38 @@
+{
+  "name": "censitas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.15.1",
+  "engines": {
+    "node": ">=24.0.0 <27"
+  },
+  "scripts": {
+    "dev": "pnpm build:widget && node --env-file-if-exists=.env --import tsx scripts/dev.ts",
+    "build": "pnpm build:widget && nuxt build",
+    "build:widget": "esbuild widget/censitas-track.ts --bundle --format=esm --target=es2022 --minify --outfile=public/v1/track.js --log-level=warning",
+    "typecheck": "nuxt typecheck && tsc -p widget",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test",
+    "format": "oxfmt -c oxfmt.config.ts .",
+    "format:check": "oxfmt -c oxfmt.config.ts --check .",
+    "lint": "oxlint -c oxlint.config.ts",
+    "lint:fix": "oxlint -c oxlint.config.ts --fix",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "nuxt": "4.5.2",
+    "vue": "3.5.42",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
+    "oxfmt": "^0.67.0",
+    "oxlint": "^1.82.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3",
+    "vue-tsc": "3.3.11"
+  }
+}
