@@ -18,10 +18,14 @@ const count = computed(() => points.value.length)
 const peak = computed(() =>
   points.value.reduce((best, point) => (point.count > best.count ? point : best)),
 )
-/** The top of the scale: the peak rounded up to 1, 2 or 5 times a power of ten. */
+/** The top of the scale: the peak rounded up to 1, 2 or 5 times a power of ten, and even, so the
+ *  middle line is a whole count (6, not 5 with 2.5 halfway). */
 const top = computed(() => {
   const magnitude = 10 ** Math.floor(Math.log10(Math.max(1, peak.value.count)))
-  return [1, 2, 5, 10].map((step) => step * magnitude).find((value) => value >= peak.value.count)!
+  const nice = [1, 2, 5, 10]
+    .map((step) => step * magnitude)
+    .find((value) => value >= peak.value.count)!
+  return nice % 2 ? nice + 1 : nice
 })
 const ticks = computed(() => [top.value, top.value / 2, 0])
 

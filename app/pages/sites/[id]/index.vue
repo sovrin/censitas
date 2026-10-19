@@ -49,7 +49,14 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           <li aria-current="page" class="font-mono">{{ id }}</li>
         </ol>
       </nav>
-      <NuxtLink :to="`/sites/${id}/settings`" class="link text-s">Settings</NuxtLink>
+      <span class="cluster gap-4 text-s">
+        <!-- Colour only where the owner is needed: events the settings turn away. The details
+             wait at the end of the page. -->
+        <a v-if="data?.refused.total" href="#refused" class="link text-warning"
+          >{{ formatCount(data.refused.total) }} refused</a
+        >
+        <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>
+      </span>
     </div>
 
     <header class="cluster justify-between items-end gap-4">
@@ -72,27 +79,6 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       </span>
     </header>
 
-    <!-- Refused beacons mean the site sends something its settings don't list: those events are
-         lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
-    <div v-if="data?.refused.total" class="alert" data-tone="warning" role="status">
-      <div class="stack gap-2">
-        <p>
-          <strong
-            >{{ formatCount(data.refused.total) }}
-            {{ data.refused.total === 1 ? 'event' : 'events' }} refused</strong
-          >
-          in the last {{ days }} days, the latest on {{ formatDay(data.refused.latest!) }}. The site
-          sends something its
-          <NuxtLink :to="`/sites/${id}/settings`" class="link">settings</NuxtLink> don't list, and
-          those events aren't counted.
-        </p>
-        <ul class="text-s">
-          <li v-for="refusal in refusals" :key="refusal.reason">
-            <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
-          </li>
-        </ul>
-      </div>
-    </div>
     <div v-if="error" class="alert" data-tone="danger" role="alert">
       <div><strong>Could not load this site.</strong> {{ errorMessage(error) }}</div>
       <button type="button" class="btn" data-size="s" @click="refresh()">Try again</button>
@@ -183,5 +169,28 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         </table>
       </section>
     </template>
+
+    <!-- Refused beacons mean the site sends something its settings don't list: those events are
+         lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
+    <section
+      v-if="data?.refused.total"
+      id="refused"
+      class="stack gap-3 hairline-t pt-5"
+      aria-labelledby="refused-title"
+    >
+      <h2 id="refused-title" class="text-s weight-600">Refused</h2>
+      <p class="text-s text-muted">
+        {{ formatCount(data.refused.total) }}
+        {{ data.refused.total === 1 ? 'event' : 'events' }} in the last {{ days }} days, the latest
+        on {{ formatDay(data.refused.latest!) }}, sent something the
+        <NuxtLink :to="`/sites/${id}/settings`" class="link">settings</NuxtLink> don't list, and
+        weren't counted.
+      </p>
+      <ul class="text-s">
+        <li v-for="refusal in refusals" :key="refusal.reason">
+          <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
+        </li>
+      </ul>
+    </section>
   </div>
 </template>
