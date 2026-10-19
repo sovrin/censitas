@@ -39,6 +39,30 @@ const refusals = computed(() =>
     label: REFUSAL_LABELS[reason],
   })),
 )
+// Live: the counts move as beacons arrive, a few seconds apart at most.
+useLive(refresh)
+/** Dimmed only while another range loads; a live refresh swaps the numbers in place. */
+const changingRange = computed(
+  () => status.value === 'pending' && data.value?.days.length !== days.value,
+)
+
+// Once the owner has dealt with refused beacons (fixed the settings, or knows why), they go;
+// refusals that come after show again.
+const clearing = ref(false)
+const clearError = ref('')
+async function clearRefused() {
+  clearing.value = true
+  clearError.value = ''
+  try {
+    await $fetch(`/api/sites/${id.value}/refusals/clear`, { method: 'POST', body: {} })
+    await refresh()
+  } catch (cause) {
+    clearError.value = errorMessage(cause)
+  } finally {
+    clearing.value = false
+  }
+}
+
 const share = (count: number, total: number) => (total ? count / total : 0)
 const percent = (value: number) => `${Math.round(value * 100)}%`
 </script>
@@ -93,7 +117,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
     <div
       v-if="data && counted.length"
       class="refetch stack gap-6"
-      :data-pending="status === 'pending' || undefined"
+      :data-pending="changingRange || undefined"
     >
       <!-- The figures of the range, each against the same number of days before it. -->
       <div class="headline hairline-b pb-5">
@@ -185,7 +209,18 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       class="stack gap-3 hairline-t pt-5"
       aria-labelledby="refused-title"
     >
-      <h2 id="refused-title" class="text-s weight-600">Refused</h2>
+      <div class="cluster justify-between gap-4">
+        <h2 id="refused-title" class="text-s weight-600">Refused</h2>
+        <button
+          type="button"
+          class="link text-s"
+          :disabled="clearing"
+          :aria-busy="clearing || undefined"
+          @click="clearRefused"
+        >
+          Clear
+        </button>
+      </div>
       <p class="text-s text-muted">
         {{ formatCount(data.refused.total) }}
         {{ data.refused.total === 1 ? 'event' : 'events' }} in the last {{ days }} days, the latest
@@ -198,6 +233,12 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
         </li>
       </ul>
+      <p class="text-xs text-muted">
+        Clear forgets these for good, on every range; refusals after that show again.
+      </p>
+      <div v-if="clearError" class="alert" data-tone="danger" role="alert">
+        <div><strong>Could not clear them.</strong> {{ clearError }}</div>
+      </div>
     </section>
   </div>
 </template>

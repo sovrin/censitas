@@ -13,7 +13,9 @@ value, count) and nothing that could tell one visitor from another. It is Nuxt, 
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
                      ── POST /v1/e                   → one event, counted if its site allows it
-owner               ── /                             sites, daily counts, breakdowns, settings (signed in)
+owner               ── /                             sites, daily counts, breakdowns, settings
+(signed in)
+                     ── GET  /api/events             → live: "something changed", every 3 s at most
 ```
 
 ## What is counted
@@ -93,7 +95,11 @@ Sites are configured in the dashboard (Sites → Add a site), each with:
   lowercase with dashes, props letters and digits, values up to 40 of letters, digits and
   `. : + - _`.
 
-A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals per site and day by reason (an origin, event, prop or value not listed), never what was sent. The site page warns about them and the sites list marks the site `refused`: update the settings when a release starts sending something new. A change applies from the next beacon on. The site's settings page shows the snippet to put in it.
+A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals
+per site and day by reason (an origin, event, prop or value not listed), never what was sent. The
+site page shows how many next to Settings, with the details at its end: update the settings when a
+release starts sending something new, then Clear them; only refusals after that show again. A change
+applies from the next beacon on. The site's settings page shows the snippet to put in it.
 Deleting a site deletes its counts with it.
 
 **Import and export** (under the sites list) move settings, never counts, as one JSON file:
@@ -116,7 +122,8 @@ anything continuous, like the song length, before sending it.
 
 ## Abuse
 
-Beacons need a configured site, a matching `Origin` and listed names and values, and must state their
+Beacons need a configured site, a matching `Origin` and listed names and values, and must state
+their
 length and stay under 4 kB. Requests without a user agent or with a known bot's are answered 204
 and not counted. Each sender (an IPv4 address or an IPv6 /64) may send 60 events a minute; the
 table of senders lives in memory and is dropped every minute. None of this can stop someone

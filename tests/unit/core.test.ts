@@ -5,6 +5,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { siteConfigSchema, sitesFileSchema, type SiteConfig } from '../../shared/contracts'
 import {
+  clearRefusals,
   countEvent,
   countRefusal,
   countToday,
@@ -190,6 +191,22 @@ describe('refusals', () => {
     })
     deleteSite(db, 'sonotas')
     expect(db.prepare('SELECT * FROM refusals').all()).toEqual([])
+  })
+
+  it('are forgotten when cleared, and only later ones show', () => {
+    const db = database()
+    countRefusal(db, 'sonotas', 'value', NOW - DAY)
+    countRefusal(db, 'other', 'value', NOW - DAY)
+    expect(clearRefusals(db, 'sonotas')).toBe(1)
+    expect(siteReport(db, sonotas, 7, NOW).refused.total).toBe(0)
+    countRefusal(db, 'sonotas', 'event', NOW)
+    expect(siteReport(db, sonotas, 7, NOW).refused).toMatchObject({
+      total: 1,
+      latest: '2026-10-19',
+    })
+    expect(db.prepare("SELECT count(*) AS n FROM refusals WHERE site = 'other'").get()).toEqual({
+      n: 1,
+    })
   })
 })
 

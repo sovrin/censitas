@@ -45,6 +45,12 @@ export function countRefusal(db: DatabaseSync, site: string, reason: Refusal, no
   ).run(site, dayOf(now), reason)
 }
 
+/** Forgets every refusal a site has counted, once the owner has dealt with them: only ones that
+ *  come after show again. */
+export function clearRefusals(db: DatabaseSync, site: string) {
+  return Number(db.prepare('DELETE FROM refusals WHERE site = ?').run(site).changes)
+}
+
 /** A site's refusals since `day`: how many by reason, and the last day there were any. */
 function refusalsSince(db: DatabaseSync, site: string, day: string) {
   const rows = db
