@@ -38,8 +38,9 @@ const { data, error, refresh } = await useFetch<SiteSummary[]>('/api/sites')
           </p>
         </li>
       </ul>
-      <p v-else class="text-muted">No sites yet. Add one to the sites file and restart.</p>
+      <p v-else class="text-muted">No sites yet. Add one to get the tracker to put in it.</p>
       <p v-if="data.length" class="text-s text-muted">Counted over the last 30 days.</p>
+      <p><NuxtLink to="/sites/new" class="link">Add a site</NuxtLink></p>
     </template>
   </div>
 </template>

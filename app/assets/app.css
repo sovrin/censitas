@@ -75,6 +75,12 @@ button.link[data-quiet] {
   flex: none;
 }
 
+/* The tracker snippet wraps a long address instead of scrolling inside the column. */
+.snippet {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* A breadcrumb mixes sans words with mono site ids, whose boxes differ in height; centred they sit
    at different heights, so line them up on the text instead.
    shortcut: remove once aequitas' .breadcrumb aligns its items on the baseline. */

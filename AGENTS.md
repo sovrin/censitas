@@ -7,18 +7,19 @@ Conventions for working on censitas, in code and in the interface.
 - Keep comprehension debt low: explicit control flow, small modules, framework conventions, no
   speculative abstractions. Comments say why, not what.
 - Every rule about input lives once, in `shared/contracts.ts` (zod), and is checked at runtime on
-  the server: the sites file and each beacon.
+  the server: a site's settings and each beacon. The dashboard's forms use the same schemas.
 - Data access is plain SQL in `server/core/*.ts`: functions that take the database first, no ORM.
   Schema changes are a new `PRAGMA user_version` step in `server/core/database.ts`; never edit a
   released step.
 - Privacy is the product. Nothing that tells visitors apart is stored or logged: no IP address,
   user agent, time of day, page address, referrer or identifier, and no new column that could hold
   one. The IP address and user agent are read in memory for the bot check and the rate limit, and
-  dropped. Only names and values from the sites file reach the database.
+  dropped. Only names and values from a site's settings reach the counters.
 - The tracker (`widget/`) runs in other people's pages: it uses no cookie or storage API, reads
   nothing from the browser, and makes no identifier. `tests/unit/track.test.ts` holds it to that.
 - Everything is the owner's dashboard behind basic auth (`server/middleware/security.ts`), except
-  the public paths listed there. `/v1/*` is public and versioned: sites already out there load the
+  the public paths listed there. Its writes must also come from the exact `CENSITAS_ORIGIN`:
+  browsers send basic auth along with any site's request. `/v1/*` is public and versioned: sites already out there load the
   tracker and send its beacons, so it only grows (new fields optional, nothing renamed or removed).
 
 ## UI

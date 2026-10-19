@@ -2,10 +2,9 @@ import { resolve } from 'node:path'
 import type { H3Event } from 'h3'
 import { openDatabase } from '../core/database'
 import { senderNetwork } from '../core/limits'
-import { loadSites } from '../core/sites'
+import { getSite } from '../core/sites'
 
 let database: ReturnType<typeof openDatabase> | undefined
-let sites: ReturnType<typeof loadSites> | undefined
 
 export function censitasDatabase() {
   const dataDir = process.env.CENSITAS_DATA_DIR
@@ -13,11 +12,18 @@ export function censitasDatabase() {
   return (database ??= openDatabase(resolve(dataDir)))
 }
 
-/** The sites file, read once: a change to it takes a restart. */
-export function censitasSites() {
-  const path = process.env.CENSITAS_SITES
-  if (!path) throw new Error('CENSITAS_SITES must point at the sites file.')
-  return (sites ??= loadSites(resolve(path)))
+/** Where the dashboard lives; its own writes must come from here. */
+export function censitasOrigin() {
+  const configured = process.env.CENSITAS_ORIGIN
+  if (!configured) throw new Error('CENSITAS_ORIGIN must be set for the web server.')
+  return new URL(configured).origin
+}
+
+/** The site named in the route, or a 404. */
+export function routeSite(event: H3Event) {
+  const site = getSite(censitasDatabase(), getRouterParam(event, 'id') ?? '')
+  if (!site) throw createError({ statusCode: 404, statusMessage: 'This site is not configured.' })
+  return site
 }
 
 /** Who is asking, for the in-memory limits only. The proxy in front appends the address it saw

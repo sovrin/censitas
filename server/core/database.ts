@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-const VERSION = 1
+const VERSION = 2
 
 export function openDatabase(dataDir: string) {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 })
@@ -23,6 +23,15 @@ export function openDatabase(dataDir: string) {
         PRIMARY KEY (site, day, event, prop, value)
       ) WITHOUT ROWID;
       PRAGMA user_version = 1;
+    `)
+    // Sites are configured in the dashboard, no longer in a file.
+    if (version < 2)
+      db.exec(`
+      CREATE TABLE sites (
+        id TEXT PRIMARY KEY, origins TEXT NOT NULL, events TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      PRAGMA user_version = 2;
     `)
   })
   return db

@@ -1,7 +1,7 @@
 import { countEvent } from '../../core/counts'
 import { createLimiter, isBot } from '../../core/limits'
-import { acceptBeacon } from '../../core/sites'
-import { censitasDatabase, censitasSites, requestSender } from '../../utils/censitas'
+import { acceptBeacon, getSite } from '../../core/sites'
+import { censitasDatabase, requestSender } from '../../utils/censitas'
 
 // A visitor sends a page view and a handful of events; a script sending more is not one.
 const perSender = createLimiter(60, 60 * 1000)
@@ -12,8 +12,9 @@ export default defineEventHandler(async (event) => {
   setResponseStatus(event, 204)
   // A bot hears success and nothing is counted.
   if (isBot(getHeader(event, 'user-agent'))) return null
+  const db = censitasDatabase()
   const accepted = acceptBeacon(
-    censitasSites(),
+    (id) => getSite(db, id),
     getHeader(event, 'origin'),
     (await readRawBody(event, 'utf8')) ?? '',
   )
@@ -21,6 +22,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: accepted.status, statusMessage: accepted.error })
   if (!perSender.hit(requestSender(event)))
     throw createError({ statusCode: 429, statusMessage: 'Too many events. Try again later.' })
-  countEvent(censitasDatabase(), accepted.site, accepted.event, accepted.props)
+  countEvent(db, accepted.site, accepted.event, accepted.props)
   return null
 })

@@ -9,7 +9,7 @@ const days = computed(() =>
 )
 useHead({ title: () => `${id.value} · censitas` })
 
-const { data, error, refresh } = await useFetch<SiteReport>(() => `/api/sites/${id.value}`, {
+const { data, error, refresh } = await useFetch<SiteReport>(() => `/api/sites/${id.value}/report`, {
   query: { days },
 })
 
@@ -28,25 +28,27 @@ const share = (count: number, total: number) =>
           <li aria-current="page" class="font-mono">{{ id }}</li>
         </ol>
       </nav>
-      <span class="cluster gap-3 text-s" role="group" aria-label="Range">
-        <NuxtLink
-          v-for="range in RANGES"
-          :key="range"
-          :to="{ query: range === 30 ? {} : { days: String(range) } }"
-          class="link"
-          :data-quiet="days === range ? undefined : ''"
-          :aria-current="days === range ? 'page' : undefined"
-          >{{ range }} days</NuxtLink
-        >
-      </span>
+      <NuxtLink :to="`/sites/${id}/settings`" class="link text-s">Settings</NuxtLink>
     </div>
+    <span class="cluster gap-3 text-s" role="group" aria-label="Range">
+      <NuxtLink
+        v-for="range in RANGES"
+        :key="range"
+        :to="{ query: range === 30 ? {} : { days: String(range) } }"
+        class="link"
+        :data-quiet="days === range ? undefined : ''"
+        :aria-current="days === range ? 'page' : undefined"
+        >{{ range }} days</NuxtLink
+      >
+    </span>
 
     <div v-if="error" class="alert" data-tone="danger" role="alert">
       <div><strong>Could not load this site.</strong> {{ errorMessage(error) }}</div>
       <button type="button" class="btn" data-size="s" @click="refresh()">Try again</button>
     </div>
     <p v-else-if="data && !counted.length" class="text-muted">
-      Nothing counted in the last {{ days }} days.
+      Nothing counted in the last {{ days }} days. The tracker to put in the site is under
+      <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>.
     </p>
     <template v-else-if="data">
       <section

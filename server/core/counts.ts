@@ -30,20 +30,20 @@ export function countEvent(
   })
 }
 
-/** Every configured site with what it counted in the last 30 days. */
+/** Every site with what it counted in the last 30 days. */
 export function siteSummaries(
   db: DatabaseSync,
-  sites: Record<string, SiteConfig>,
+  sites: SiteConfig[],
   now = Date.now(),
 ): SiteSummary[] {
   const totals = db.prepare(
     `SELECT coalesce(sum(count), 0) AS events, coalesce(sum(count) FILTER (WHERE event = 'pageview'), 0) AS pageviews
     FROM counts WHERE site = ? AND prop = '' AND day >= ?`,
   )
-  return Object.entries(sites).map(([id, site]) => ({
-    id,
+  return sites.map((site) => ({
+    id: site.id,
     origins: site.origins,
-    ...(totals.get(id, since(30, now)) as { events: number; pageviews: number }),
+    ...(totals.get(site.id, since(30, now)) as { events: number; pageviews: number }),
   }))
 }
 
@@ -60,14 +60,13 @@ export function countToday(db: DatabaseSync, now = Date.now()) {
  *  Configured events come first in their order, then any counted since dropped from the config. */
 export function siteReport(
   db: DatabaseSync,
-  id: string,
   site: SiteConfig,
   days: number,
   now = Date.now(),
 ): SiteReport {
   const rows = db
     .prepare(`SELECT day, event, prop, value, count FROM counts WHERE site = ? AND day >= ?`)
-    .all(id, since(days, now)) as {
+    .all(site.id, since(days, now)) as {
     day: string
     event: string
     prop: string
@@ -109,7 +108,7 @@ export function siteReport(
   for (const entry of events.values())
     for (const prop of entry.props) prop.values.sort((a, b) => b.count - a.count)
   return {
-    id,
+    id: site.id,
     days: Array.from({ length: days }, (_, i) => dayOf(now - i * DAY)),
     events: [...events.values()],
   }

@@ -12,8 +12,8 @@ value, count) and nothing that could tell one visitor from another. It is Nuxt, 
 
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
-                     ── POST /v1/e                   → one event, counted if the sites file allows it
-owner               ── /                             sites, daily counts, breakdowns (basic auth)
+                     ── POST /v1/e                   → one event, counted if its site allows it
+owner               ── /                             sites, daily counts, breakdowns, settings (basic auth)
 ```
 
 ## What is counted
@@ -28,7 +28,7 @@ user agent or any identifier, so no two counts can be joined into one person's v
 counted one by one, so they can't be combined either: censitas knows how many exports were 1080p
 and how many were dark, not how many were both.
 
-Only names and values listed in the sites file are counted. A forged beacon can at most raise a
+Only names and values listed in the site's settings are counted. A forged beacon can at most raise a
 counter that exists already; it cannot put new text in the database.
 
 ## Why no consent banner
@@ -76,41 +76,29 @@ track('export-start', { resolution: '1080p', theme: 'dark' })
 
 Importing it counts one `pageview`. Each `track(event, props)` sends one beacon
 (`navigator.sendBeacon`, text/plain, so there's no CORS preflight and it survives the tab closing).
-Prop values are strings. A beacon the sites file doesn't allow is refused with a 400 or 403 that
+Prop values are strings. A beacon its site doesn't allow is refused with a 400 or 403 that
 only your network panel shows; check there when a counter stays at 0. Bucket anything continuous
 before you send it: `duration: '1-3min'`, never `duration: '127'`.
 
 In a Nuxt or Vite app, the URL is external, so mark the import `/* @vite-ignore */`.
 
-## The sites file
+## Sites
 
-Sites are configured in a JSON file, read when the server starts (restart after a change). Start
-from `sites.example.json`:
+Sites are configured in the dashboard (Sites → Add a site), each with:
 
-```json
-{
-  "sonotas": {
-    "origins": ["https://sonotas.example.com"],
-    "events": {
-      "pageview": {},
-      "load": { "source": ["demo", "file"], "format": ["gp", "gpx", "gp5"] },
-      "link-copy": {}
-    }
-  }
-}
-```
+- **an id**, which the tracker is imported with (`?site=sonotas`) and which never changes;
+- **origins**, the sites that may send, matched exactly against each beacon's `Origin`;
+- **events**: every event the site sends, each with the props it may carry and every value each
+  prop may take. A new site starts with `pageview`, which the tracker sends on import. Names are
+  lowercase with dashes, props letters and digits, values up to 40 of letters, digits and
+  `. : + - _`.
 
-- **The key** is the site id the tracker is imported with (`?site=sonotas`).
-- **`origins`** are the sites that may send, matched exactly against each beacon's `Origin`.
-- **`events`** lists every event the site sends, each with the props it may carry and every value
-  each prop may take. `pageview` must be listed for the page view on import to count. Names are
-  lowercase with dashes, props letters and digits, values up to 40 of letters, digits and `. : + - _`.
-
-A mistake in the file stops the server with the reason.
+A change applies from the next beacon on. The site's settings page shows the snippet to put in it.
+Deleting a site deletes its counts with it.
 
 ## Abuse
 
-Beacons need a listed site, a matching `Origin` and listed names and values, and must state their
+Beacons need a configured site, a matching `Origin` and listed names and values, and must state their
 length and stay under 4 kB. Requests without a user agent or with a known bot's are answered 204
 and not counted. Each sender (an IPv4 address or an IPv6 /64) may send 60 events a minute; the
 table of senders lives in memory and is dropped every minute. None of this can stop someone
@@ -128,14 +116,14 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3100 and sign in as `owner` with `development only`. The launcher uses
-`sites.json` if you have one, `sites.example.json` otherwise; `PORT` moves the dev server.
+Open http://localhost:3100 and sign in as `owner` with `development only` (or what `.env` sets).
+`PORT` moves the dev server.
 
 ## Run with Docker Compose
 
-Copy `.env.example` to `.env` and set `CENSITAS_PASSWORD` (`openssl rand -hex 24`). Copy
-`sites.example.json` to `sites.json` and list your sites (or point `CENSITAS_SITES_FILE` at it).
-Then:
+Copy `.env.example` to `.env`, set `CENSITAS_PASSWORD` (`openssl rand -hex 24`) and the public
+address, `CENSITAS_ORIGIN=https://censitas.example.com`: the dashboard only accepts changes sent
+from there, since a browser sends basic auth along with any site's request. Then:
 
 ```sh
 docker compose up -d --build
@@ -158,7 +146,7 @@ censitas.example.com {
 Put nothing else (a CDN) in front of the proxy without changing how the sender is read. The image
 runs as an unprivileged user on Alpine with only the node binary.
 
-Counters live in the `censitas-data` volume (`censitas.sqlite`); back it up and never
+Sites and counters live in the `censitas-data` volume (`censitas.sqlite`); back it up and never
 `docker compose down -v`. They hold no personal data, so they are kept until you delete them.
 
 ## Checks

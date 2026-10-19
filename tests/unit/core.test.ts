@@ -3,11 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { sitesSchema, type Sites } from '../../shared/contracts'
+import { siteConfigSchema, type SiteConfig } from '../../shared/contracts'
 import { countEvent, countToday, siteReport, siteSummaries } from '../../server/core/counts'
 import { openDatabase } from '../../server/core/database'
 import { createLimiter, isBot, senderNetwork } from '../../server/core/limits'
-import { acceptBeacon } from '../../server/core/sites'
+import {
+  acceptBeacon,
+  createSite,
+  deleteSite,
+  getSite,
+  listSites,
+  updateSite,
+} from '../../server/core/sites'
 
 const DAY = 24 * 60 * 60 * 1000
 const NOW = Date.UTC(2026, 9, 19, 12)
@@ -27,31 +34,47 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const sites: Sites = sitesSchema.parse({
-  sonotas: {
-    origins: ['https://sonotas.example.com/'],
-    events: {
-      pageview: {},
-      load: { source: ['demo', 'file'], format: ['gp', 'gpx'] },
-    },
+const sonotas: SiteConfig = siteConfigSchema.parse({
+  id: 'sonotas',
+  origins: ['https://sonotas.example.com/'],
+  events: {
+    pageview: {},
+    load: { source: ['demo', 'file'], format: ['gp', 'gpx'] },
   },
 })
 const ORIGIN = 'https://sonotas.example.com'
+const findSite = (id: string) => (id === sonotas.id ? sonotas : null)
 const beacon = (body: object, origin: string | undefined = ORIGIN) =>
-  acceptBeacon(sites, origin, JSON.stringify(body))
+  acceptBeacon(findSite, origin, JSON.stringify(body))
 
-describe('sites file', () => {
-  it('refuses origins with a path, bad names and free-text values', () => {
+describe('site settings', () => {
+  it('refuse origins with a path, bad names, free-text values and repeats', () => {
     const site = (events: object, origins = [ORIGIN]) =>
-      sitesSchema.safeParse({ sonotas: { origins, events } }).success
+      siteConfigSchema.safeParse({ id: 'sonotas', origins, events }).success
     expect(site({ pageview: {} })).toBe(true)
     expect(site({ pageview: {} }, ['https://sonotas.example.com/app'])).toBe(false)
+    expect(site({ pageview: {} }, [])).toBe(false)
+    expect(site({})).toBe(false)
     expect(site({ PageView: {} })).toBe(false)
     expect(site({ load: { source: ['a file name.gp'] } })).toBe(false)
     expect(site({ load: { source: [] } })).toBe(false)
-    expect(sitesSchema.safeParse({ Sonotas: { origins: [ORIGIN], events: {} } }).success).toBe(
-      false,
-    )
+    expect(site({ load: { source: ['demo', 'demo'] } })).toBe(false)
+    expect(siteConfigSchema.safeParse({ ...sonotas, id: 'Sonotas' }).success).toBe(false)
+  })
+
+  it('are stored, listed, changed, and deleted with their counts', () => {
+    const db = database()
+    expect(createSite(db, sonotas)).toBe(true)
+    expect(createSite(db, sonotas)).toBe(false)
+    expect(getSite(db, 'sonotas')).toEqual(sonotas)
+    const changed = { ...sonotas, events: { pageview: {}, 'link-copy': {} } }
+    expect(updateSite(db, 'sonotas', changed)).toBe(true)
+    expect(listSites(db)).toEqual([changed])
+    countEvent(db, 'sonotas', 'pageview', {}, NOW)
+    countEvent(db, 'other', 'pageview', {}, NOW)
+    expect(deleteSite(db, 'sonotas')).toBe(true)
+    expect(getSite(db, 'sonotas')).toBeNull()
+    expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
   })
 })
 
@@ -71,13 +94,12 @@ describe('beacons', () => {
 
   it('are refused for another site or origin', () => {
     expect(beacon({ site: 'other', event: 'pageview' })).toMatchObject({ status: 403 })
-    expect(beacon({ site: 'constructor', event: 'pageview' })).toMatchObject({ status: 403 })
     expect(beacon({ site: 'sonotas', event: 'pageview' }, 'https://evil.example')).toMatchObject({
       status: 403,
     })
     // without an Origin header (a default parameter would swallow undefined)
     expect(
-      acceptBeacon(sites, undefined, JSON.stringify({ site: 'sonotas', event: 'pageview' })),
+      acceptBeacon(findSite, undefined, JSON.stringify({ site: 'sonotas', event: 'pageview' })),
     ).toMatchObject({ status: 403 })
     expect(beacon({ site: 'sonotas', event: 'pageview' }, 'null')).toMatchObject({ status: 403 })
   })
@@ -97,7 +119,7 @@ describe('beacons', () => {
   })
 
   it('are refused when they are not the expected JSON or too long', () => {
-    expect(acceptBeacon(sites, ORIGIN, 'not json')).toMatchObject({ status: 400 })
+    expect(acceptBeacon(findSite, ORIGIN, 'not json')).toMatchObject({ status: 400 })
     expect(beacon({ site: 'sonotas', event: 'pageview', extra: 1 })).toMatchObject({ status: 400 })
     expect(beacon({ site: 'sonotas', event: 'load', props: { source: 1 } })).toMatchObject({
       status: 400,
@@ -136,7 +158,7 @@ describe('counters', () => {
       { site: 'sonotas', day: '2026-10-19', event: 'pageview', prop: '', value: '', count: 1 },
     ])
     expect(countToday(db, NOW)).toBe(3)
-    expect(siteSummaries(db, sites, NOW)).toEqual([
+    expect(siteSummaries(db, [sonotas], NOW)).toEqual([
       { id: 'sonotas', origins: [ORIGIN], events: 4, pageviews: 1 },
     ])
   })
@@ -146,7 +168,7 @@ describe('counters', () => {
     countEvent(db, 'sonotas', 'load', { source: 'file' }, NOW)
     countEvent(db, 'sonotas', 'load', { source: 'file' }, NOW - DAY)
     countEvent(db, 'sonotas', 'load', { source: 'demo' }, NOW - 7 * DAY)
-    const report = siteReport(db, 'sonotas', sites.sonotas!, 7, NOW)
+    const report = siteReport(db, sonotas, 7, NOW)
     expect(report.days).toHaveLength(7)
     expect(report.days[0]).toBe('2026-10-19')
     expect(report.events.map((event) => event.name)).toEqual(['pageview', 'load'])

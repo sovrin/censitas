@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 
@@ -6,15 +5,11 @@ const port = process.env.PORT || '3100'
 const env = {
   ...process.env,
   CENSITAS_DATA_DIR: resolve(process.env.CENSITAS_DATA_DIR || '.data'),
-  // Your own sites.json once you have one, the example until then.
-  CENSITAS_SITES: resolve(
-    process.env.CENSITAS_SITES || (existsSync('sites.json') ? 'sites.json' : 'sites.example.json'),
-  ),
+  CENSITAS_ORIGIN: process.env.CENSITAS_ORIGIN || `http://localhost:${port}`,
   CENSITAS_USER: process.env.CENSITAS_USER || 'owner',
   CENSITAS_PASSWORD: process.env.CENSITAS_PASSWORD || 'development only',
 }
-console.info(`censitas development: http://localhost:${port}`)
-console.info(`Sites: ${env.CENSITAS_SITES}`)
+console.info(`censitas development: ${env.CENSITAS_ORIGIN}`)
 console.info(
   `Dashboard sign-in: ${process.env.CENSITAS_PASSWORD ? 'configured in environment' : 'owner / development only'}`,
 )

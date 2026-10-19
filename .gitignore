@@ -13,6 +13,3 @@ coverage/
 
 # built from widget/ by `pnpm build:widget`
 /public/v1/track.js
-
-# your own sites; sites.example.json is the tracked starting point
-/sites.json

@@ -18,35 +18,47 @@ const VALUE = /^[\w.:+-]{1,40}$/
 
 export const siteIdSchema = z.string().regex(NAME, 'Use lowercase letters, digits and dashes.')
 
+/** A record whose keys must match `pattern`. A bad key is reported at its own path with
+ *  `message`; zod's own key check only says the record has an invalid key. */
+function keyed<T extends z.ZodType>(pattern: RegExp, message: string, value: T) {
+  return z.record(z.string(), value).superRefine((record, context) => {
+    for (const key of Object.keys(record))
+      if (!pattern.test(key)) context.addIssue({ code: 'custom', path: [key], message })
+  })
+}
+
 /** One event a site may send: each prop it may carry, with the values it may take. */
-export const eventRulesSchema = z.record(
-  z.string().regex(PROP, 'Start a prop with a letter; letters and digits only.'),
-  z.array(z.string().regex(VALUE, 'Use letters, digits and . : + - _ in a value.')).min(1).max(50),
-)
+export const eventRulesSchema = keyed(
+  PROP,
+  'Start a prop with a letter; letters and digits only.',
+  z
+    .array(z.string().regex(VALUE, 'Use letters, digits and . : + - _ in a value.'))
+    .min(1, 'List at least one value.')
+    .max(50)
+    .refine((values) => new Set(values).size === values.length, 'Each value once.'),
+).refine((props) => Object.keys(props).length <= 10, 'At most 10 props.')
 export type EventRules = z.infer<typeof eventRulesSchema>
 
+/** A site and everything it may send. Only what is listed here is counted. */
 export const siteConfigSchema = z
   .object({
+    id: siteIdSchema,
     origins: z
       .array(
         z
           .string()
+          .trim()
           .transform((value) => value.replace(/\/$/, ''))
           .refine(isOrigin, 'Enter an origin like https://sonotas.example.com, without a path.'),
       )
-      .min(1)
+      .min(1, 'Add the site that sends.')
       .max(10),
-    events: z.record(
-      z.string().regex(NAME, 'Use lowercase letters, digits and dashes.'),
-      eventRulesSchema,
-    ),
+    events: keyed(NAME, 'Use lowercase letters, digits and dashes.', eventRulesSchema)
+      .refine((events) => Object.keys(events).length >= 1, 'List at least one event.')
+      .refine((events) => Object.keys(events).length <= 50, 'At most 50 events.'),
   })
   .strict()
 export type SiteConfig = z.infer<typeof siteConfigSchema>
-
-/** The sites file: every site by its id. */
-export const sitesSchema = z.record(siteIdSchema, siteConfigSchema)
-export type Sites = z.infer<typeof sitesSchema>
 
 /** What track.js sends. Names, props and values are checked against the site afterwards. */
 export const beaconSchema = z

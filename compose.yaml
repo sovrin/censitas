@@ -12,14 +12,13 @@ services:
         aequitas: ${AEQUITAS_DIST:-../aequitas/dist}
     environment:
       CENSITAS_DATA_DIR: /data
-      CENSITAS_SITES: /config/sites.json
+      CENSITAS_ORIGIN: ${CENSITAS_ORIGIN:-http://localhost:3100}
       CENSITAS_USER: ${CENSITAS_USER:-owner}
       CENSITAS_PASSWORD: ${CENSITAS_PASSWORD:?Set a dashboard password of at least 12 characters}
     ports:
       - ${CENSITAS_BIND:-127.0.0.1:3100}:3000
     volumes:
       - censitas-data:/data
-      - ${CENSITAS_SITES_FILE:-./sites.json}:/config/sites.json:ro
     restart: unless-stopped
     healthcheck:
       test:
