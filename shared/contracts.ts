@@ -121,8 +121,6 @@ export interface SiteSummary {
   previousPageviews: number
   /** Page views per day over the last 30 days, oldest first. */
   trend: number[]
-  /** Beacons refused in the last 30 days. */
-  refused: number
 }
 
 export interface EventReport {

@@ -188,7 +188,6 @@ describe('refusals', () => {
       reasons: { origin: 0, event: 1, prop: 0, value: 2 },
       latest: '2026-10-19',
     })
-    expect(siteSummaries(db, [sonotas], NOW)[0]!.refused).toBe(3)
     deleteSite(db, 'sonotas')
     expect(db.prepare('SELECT * FROM refusals').all()).toEqual([])
   })

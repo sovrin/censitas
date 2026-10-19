@@ -95,7 +95,6 @@ export function siteSummaries(
         previousPageviews: number
       }),
       trend: days.map((day) => counts.get(day) ?? 0),
-      refused: refusalsSince(db, site.id, days[0]!).total,
     }
   })
 }

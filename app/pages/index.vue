@@ -136,14 +136,6 @@ const list = (ids: string[]) => ids.join(', ')
               ></span
             >
             <span v-else class="text-muted">quiet</span>
-            <!-- Colour only where the owner is needed: events the site's settings turn away. -->
-            <NuxtLink
-              v-if="site.refused"
-              :to="`/sites/${site.id}`"
-              class="link text-warning"
-              :data-tip="`${formatCount(site.refused)} events refused in 30 days`"
-              >refused</NuxtLink
-            >
           </div>
           <p class="ps-4 cluster justify-between gap-3 font-mono text-xs text-muted">
             <span class="break-words min-w-0">{{ site.origins.join(' · ') }}</span>
