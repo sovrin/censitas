@@ -17,6 +17,7 @@ import { createLimiter, isBot, senderNetwork } from '../../server/core/limits'
 import {
   acceptBeacon,
   createSite,
+  deleteCounts,
   deleteSite,
   getSite,
   importSites,
@@ -82,6 +83,21 @@ describe('site settings', () => {
     countEvent(db, 'other', 'pageview', {}, NOW)
     expect(deleteSite(db, 'sonotas')).toBe(true)
     expect(getSite(db, 'sonotas')).toBeNull()
+    expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
+  })
+})
+
+describe('deleting counts', () => {
+  it("clears a site's counts and refusals, keeping the site and other sites' data", () => {
+    const db = database()
+    createSite(db, sonotas)
+    countEvent(db, 'sonotas', 'load', { source: 'demo' }, NOW)
+    countRefusal(db, 'sonotas', 'value', NOW)
+    countEvent(db, 'other', 'pageview', {}, NOW)
+    expect(deleteCounts(db, 'sonotas')).toBe(3)
+    expect(getSite(db, 'sonotas')).toEqual(sonotas)
+    expect(siteReport(db, sonotas, 7, NOW).events.every((event) => !event.total)).toBe(true)
+    expect(siteReport(db, sonotas, 7, NOW).refused.total).toBe(0)
     expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
   })
 })

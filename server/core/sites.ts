@@ -46,6 +46,17 @@ export function updateSite(db: DatabaseSync, id: string, site: SiteConfig, now =
   )
 }
 
+/** Deletes every count and refusal a site has, keeping the site: it counts again from zero.
+ *  Returns how many rows went. */
+export function deleteCounts(db: DatabaseSync, id: string) {
+  return transaction(
+    db,
+    () =>
+      Number(db.prepare('DELETE FROM counts WHERE site = ?').run(id).changes) +
+      Number(db.prepare('DELETE FROM refusals WHERE site = ?').run(id).changes),
+  )
+}
+
 /** Deletes the site and every count it has. */
 export function deleteSite(db: DatabaseSync, id: string) {
   return transaction(db, () => {

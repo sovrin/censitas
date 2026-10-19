@@ -100,7 +100,8 @@ per site and day by reason (an origin, event, prop or value not listed), never w
 site page shows how many next to Settings, with the details at its end: update the settings when a
 release starts sending something new, then Clear them; only refusals after that show again. A change
 applies from the next beacon on. The site's settings page shows the snippet to put in it.
-Deleting a site deletes its counts with it.
+Delete counts (on the settings page) starts a site over from zero, after testing for example, and
+keeps its settings and tracker; deleting the site deletes its counts with it.
 
 **Import and export** (under the sites list) move settings, never counts, as one JSON file:
 

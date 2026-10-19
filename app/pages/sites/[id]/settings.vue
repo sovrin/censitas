@@ -33,14 +33,42 @@ async function copy() {
   setTimeout(() => (copied.value = false), 2000)
 }
 
+// Two things can go, each behind typing the site's id: its counts alone, or the whole site.
+type Removal = 'counts' | 'site'
+const removal = ref<Removal>('counts')
 const deleteOpen = ref(false)
 const typed = ref('')
 const deleteError = ref('')
-async function remove() {
+const countsDeleted = ref(false)
+const REMOVALS = {
+  counts: {
+    title: `Delete everything ${id} counted?`,
+    description:
+      'Its counts and refusals go; its settings and the tracker in it stay, and it counts again from zero. This cannot be undone.',
+    confirm: 'Delete counts',
+  },
+  site: {
+    title: `Delete ${id} and its counts?`,
+    description: 'This cannot be undone.',
+    confirm: 'Delete site',
+  },
+} as const
+function ask(next: Removal) {
+  removal.value = next
+  typed.value = ''
   deleteError.value = ''
+  countsDeleted.value = false
+  deleteOpen.value = true
+}
+async function remove() {
   try {
-    await $fetch(`/api/sites/${id}/delete`, { method: 'POST', body: {} })
-    await navigateTo('/')
+    if (removal.value === 'site') {
+      await $fetch(`/api/sites/${id}/delete`, { method: 'POST', body: {} })
+      await navigateTo('/')
+      return
+    }
+    await $fetch(`/api/sites/${id}/counts/delete`, { method: 'POST', body: {} })
+    countsDeleted.value = true
   } catch (cause) {
     deleteError.value = errorMessage(cause)
   }
@@ -97,28 +125,44 @@ async function remove() {
       <section class="stack gap-3 hairline-t pt-5" aria-labelledby="delete-title">
         <h2 id="delete-title" class="text-s weight-600">Delete</h2>
         <p class="text-s text-muted">
-          Removes the site and all its counts. The tracker in it is refused from then on.
+          Delete counts to start over, after testing for example: the settings and the tracker stay.
+          Delete the site to remove it with all its counts; the tracker in it is refused from then
+          on.
         </p>
-        <p>
-          <button type="button" class="link text-danger" @click="deleteOpen = true">
+        <p class="cluster gap-5">
+          <button type="button" class="link text-danger" @click="ask('counts')">
+            Delete counts
+          </button>
+          <button type="button" class="link text-danger" @click="ask('site')">
             Delete {{ site.id }}
           </button>
         </p>
+        <div v-if="countsDeleted" class="alert" data-tone="success" role="status">
+          <div>
+            <strong>Counts deleted.</strong> <span class="font-mono">{{ id }}</span> counts again
+            from zero.
+          </div>
+        </div>
         <div v-if="deleteError" class="alert" data-tone="danger" role="alert">
-          <div><strong>Could not delete the site.</strong> {{ deleteError }}</div>
+          <div>
+            <strong>{{
+              removal === 'site' ? 'Could not delete the site.' : 'Could not delete the counts.'
+            }}</strong>
+            {{ deleteError }}
+          </div>
         </div>
       </section>
     </div>
 
     <ConfirmDialog
       v-model:open="deleteOpen"
-      :title="`Delete ${id} and its counts?`"
-      confirm-label="Delete site"
+      :title="REMOVALS[removal].title"
+      :confirm-label="REMOVALS[removal].confirm"
       tone="danger"
       :disabled="typed !== id"
       @confirm="remove"
     >
-      <template #description>This cannot be undone.</template>
+      <template #description>{{ REMOVALS[removal].description }}</template>
       <div class="field">
         <label for="confirm-id"
           >Type <span class="font-mono">{{ id }}</span> to confirm</label
