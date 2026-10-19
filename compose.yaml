@@ -13,8 +13,7 @@ services:
     environment:
       CENSITAS_DATA_DIR: /data
       CENSITAS_ORIGIN: ${CENSITAS_ORIGIN:-http://localhost:3100}
-      CENSITAS_USER: ${CENSITAS_USER:-owner}
-      CENSITAS_PASSWORD: ${CENSITAS_PASSWORD:?Set a dashboard password of at least 12 characters}
+      CENSITAS_BOOTSTRAP_TOKEN: ${CENSITAS_BOOTSTRAP_TOKEN:?Set a random installation key of at least 32 characters}
     ports:
       - ${CENSITAS_BIND:-127.0.0.1:3100}:3000
     volumes:

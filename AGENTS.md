@@ -17,10 +17,10 @@ Conventions for working on censitas, in code and in the interface.
   dropped. Only names and values from a site's settings reach the counters.
 - The tracker (`widget/`) runs in other people's pages: it uses no cookie or storage API, reads
   nothing from the browser, and makes no identifier. `tests/unit/track.test.ts` holds it to that.
-- Everything is the owner's dashboard behind basic auth (`server/middleware/security.ts`), except
-  the public paths listed there. Its writes must also come from the exact `CENSITAS_ORIGIN`:
-  browsers send basic auth along with any site's request. `/v1/*` is public and versioned: sites already out there load the
-  tracker and send its beacons, so it only grows (new fields optional, nothing renamed or removed).
+- `/api/*` is the dashboard's (`server/middleware/security.ts`): the owner's session, as in
+  collatas, and for writes the exact `CENSITAS_ORIGIN`; only `/api/auth/*` and `/api/health` are
+  open. `/v1/*` is public and versioned: sites already out there load the tracker and send its
+  beacons, so it only grows (new fields optional, nothing renamed or removed).
 
 ## UI
 

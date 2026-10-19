@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-const VERSION = 3
+const VERSION = 4
 
 export function openDatabase(dataDir: string) {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 })
@@ -44,6 +44,13 @@ export function openDatabase(dataDir: string) {
         PRIMARY KEY (site, day, reason)
       ) WITHOUT ROWID;
       PRAGMA user_version = 3;
+    `)
+    // The dashboard signs in an owner account, as collatas does, instead of the HTTP basic auth it used before.
+    if (version < 4)
+      db.exec(`
+      CREATE TABLE owner (id INTEGER PRIMARY KEY CHECK (id = 1), email TEXT NOT NULL, password_hash TEXT NOT NULL);
+      CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
+      PRAGMA user_version = 4;
     `)
   })
   return db

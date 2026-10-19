@@ -13,7 +13,7 @@ value, count) and nothing that could tell one visitor from another. It is Nuxt, 
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
                      ── POST /v1/e                   → one event, counted if its site allows it
-owner               ── /                             sites, daily counts, breakdowns, settings (basic auth)
+owner               ── /                             sites, daily counts, breakdowns, settings (signed in)
 ```
 
 ## What is counted
@@ -134,14 +134,16 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3100 and sign in as `owner` with `development only` (or what `.env` sets).
-`PORT` moves the dev server.
+Open http://localhost:3100. On first run the launcher writes a random installation key to
+`.data/bootstrap-token`; use it to create the owner account. `PORT` moves the dev server. Forgot
+the password? `pnpm owner:reset --confirm` (with `CENSITAS_DATA_DIR` pointing at the data) removes
+the owner and every session, keeps sites and counts, and lets you set up again with the key.
 
 ## Run with Docker Compose
 
-Copy `.env.example` to `.env`, set `CENSITAS_PASSWORD` (`openssl rand -hex 24`) and the public
-address, `CENSITAS_ORIGIN=https://censitas.example.com`: the dashboard only accepts changes sent
-from there, since a browser sends basic auth along with any site's request. Then:
+Copy `.env.example` to `.env`, set `CENSITAS_BOOTSTRAP_TOKEN` (`openssl rand -hex 32`) and the
+public address, `CENSITAS_ORIGIN=https://censitas.example.com`: the dashboard only accepts changes
+sent from there. Then:
 
 ```sh
 docker compose up -d --build
@@ -149,7 +151,8 @@ docker compose up -d --build
 
 The web service listens on `127.0.0.1:3100` (`CENSITAS_BIND`). TLS and the public address belong
 to your reverse proxy: put it, or the network it shares, in an untracked `compose.override.yaml`.
-The dashboard's basic auth needs HTTPS in front. The proxy must append the caller's address to
+Open the address and create the owner account with the installation key; only one owner exists,
+and its session cookie is `Secure` on HTTPS. The proxy must append the caller's address to
 `X-Forwarded-For`; the rate limit counts senders by its last entry. Keep it from logging requests
 to `/v1/e` too, or it stores the addresses censitas drops. With Caddy, which logs nothing unless
 told to:

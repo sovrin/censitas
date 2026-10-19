@@ -1,34 +1,39 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
+import { createSession, sessionOwner } from '../core/auth'
 import { createLimiter } from '../core/limits'
-import { requestSender } from './censitas'
+import { censitasDatabase, censitasOrigin, requestSender } from './censitas'
 
-const hash = (value: string) => createHash('sha256').update(value).digest()
-// Ten wrong passwords per sender in 15 minutes, a hundred for everyone: a guesser gets nowhere,
-// and one sender cannot lock the owner out.
+export const SESSION_COOKIE = 'censitas_session'
+
+// Ten sign-in or setup attempts per sender in 15 minutes, a hundred for everyone: a guesser gets
+// nowhere, and one sender cannot lock the owner out.
+// shortcut: in memory, so a restart starts the count again; collatas keeps it in the database,
+// which here would put a sender's address (hashed) on disk. Persist it if restarts become a way in.
 const perSender = createLimiter(10, 15 * 60 * 1000)
 const everyone = createLimiter(100, 15 * 60 * 1000)
 
-/** The dashboard's HTTP basic auth, against CENSITAS_USER and CENSITAS_PASSWORD. */
 export function requireOwner(event: H3Event) {
-  const user = process.env.CENSITAS_USER
-  const password = process.env.CENSITAS_PASSWORD
-  if (!user || !password || password.length < 12)
+  const owner = sessionOwner(censitasDatabase(), getCookie(event, SESSION_COOKIE))
+  if (!owner) throw createError({ statusCode: 401, statusMessage: 'Sign in to continue.' })
+  return owner
+}
+
+export function setOwnerSession(event: H3Event) {
+  const session = createSession(censitasDatabase())
+  setCookie(event, SESSION_COOKIE, session.token, {
+    httpOnly: true,
+    secure: censitasOrigin().startsWith('https:'),
+    sameSite: 'lax',
+    path: '/',
+    expires: new Date(session.expiresAt),
+  })
+}
+
+/** Counts a sign-in or setup attempt, and refuses it once the sender or everyone is out of them. */
+export function checkAuthRate(event: H3Event, key: string) {
+  if (!perSender.hit(`${key}:${requestSender(event)}`) || !everyone.hit(key))
     throw createError({
-      statusCode: 503,
-      statusMessage: 'Set CENSITAS_USER and a CENSITAS_PASSWORD of at least 12 characters.',
+      statusCode: 429,
+      statusMessage: 'Too many attempts. Try again in 15 minutes.',
     })
-  const given = getHeader(event, 'authorization')?.match(/^Basic ([A-Za-z0-9+/=]{1,512})$/)?.[1]
-  if (given) {
-    // Checked before the password, so a sender out of attempts learns nothing more.
-    const sender = requestSender(event)
-    if (!perSender.allows(sender) || !everyone.allows('all'))
-      throw createError({ statusCode: 429, statusMessage: 'Too many attempts. Try again later.' })
-    const decoded = Buffer.from(given, 'base64').toString('utf8')
-    if (timingSafeEqual(hash(decoded), hash(`${user}:${password}`))) return
-    perSender.hit(sender)
-    everyone.hit('all')
-  }
-  setHeader(event, 'WWW-Authenticate', 'Basic realm="censitas", charset="UTF-8"')
-  throw createError({ statusCode: 401, statusMessage: 'Sign in to continue.' })
 }

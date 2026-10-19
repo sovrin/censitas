@@ -11,6 +11,23 @@ export function isOrigin(value: string) {
   }
 }
 
+export const ownerCredentialsSchema = z
+  .object({
+    email: z
+      .email()
+      .max(254)
+      .transform((value) => value.toLowerCase()),
+    password: z.string().min(12, 'Use at least 12 characters.').max(256),
+  })
+  .strict()
+
+export const setupSchema = ownerCredentialsSchema.extend({ token: z.string().min(32).max(256) })
+
+export interface AuthStatus {
+  setupRequired: boolean
+  owner: { email: string } | null
+}
+
 const NAME = /^[a-z][a-z0-9-]{0,39}$/
 const PROP = /^[a-z][a-zA-Z0-9]{0,31}$/
 // A value is a word from a short list the site owner wrote down, never free text from a page.
