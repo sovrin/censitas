@@ -151,10 +151,10 @@ aequitas and censitas next to each other, build aequitas once
 ```sh
 pnpm install
 ln -s ../../censitas ../nexitas/.modules/censitas
-cd ../nexitas && pnpm modules && pnpm install && pnpm dev
+cd ../nexitas && node scripts/modules.ts && pnpm install && pnpm dev
 ```
 
-`pnpm modules` fetches the other modules nexitas lists and leaves the symlink to this checkout as
+`node scripts/modules.ts` fetches the other modules nexitas lists and leaves the symlink to this checkout as
 it is. Open http://localhost:3000, create the owner with the key in nexitas' `.data/bootstrap-token`,
 and switch Usage on, at setup or under Modules. The typecheck of the pages and server runs in
 nexitas (`pnpm check` there); here `pnpm check` covers the tracker and the unit tests.

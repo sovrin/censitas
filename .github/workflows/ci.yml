@@ -10,8 +10,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: censitas
-      # aequitas and nexitas are unpublished: check them out next to censitas. The tests import the
-      # core from nexitas' sources; its install skips preparing the app, which needs every module.
+      # aequitas and nexitas are unpublished: check them out next to this module. The tests import
+      # the core from nexitas' sources, which need its install, and that needs nexitas' modules.
       # The app itself is typechecked and built in nexitas' checks.
       - uses: actions/checkout@v4
         with:
@@ -27,7 +27,7 @@ jobs:
       - run: npm install --global pnpm@11.15.1
       - run: pnpm install --frozen-lockfile && pnpm build
         working-directory: aequitas
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: node scripts/modules.ts && pnpm install --frozen-lockfile
         working-directory: nexitas
       - run: pnpm install --frozen-lockfile
         working-directory: censitas
