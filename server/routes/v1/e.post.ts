@@ -1,8 +1,9 @@
+import { createLimiter } from '#nexitas/server/core/limits'
+import { nexitasDatabase, requestSender } from '#nexitas/server/utils/nexitas'
 import { countEvent, countRefusal } from '../../core/counts'
-import { createLimiter, isBot } from '../../core/limits'
+import { isBot } from '../../core/limits'
 import { acceptBeacon, getSite } from '../../core/sites'
-import { censitasDatabase, requestSender } from '../../utils/censitas'
-import { announceBeacon } from '../../utils/changes'
+import { announceBeacon } from '../../utils/censitas'
 
 // A visitor sends a page view and a handful of events; a script sending more is not one.
 const perSender = createLimiter(60, 60 * 1000)
@@ -13,7 +14,7 @@ export default defineEventHandler(async (event) => {
   setResponseStatus(event, 204)
   // A bot hears success and nothing is counted.
   if (isBot(getHeader(event, 'user-agent'))) return null
-  const db = censitasDatabase()
+  const db = nexitasDatabase()
   const accepted = acceptBeacon(
     (id) => getSite(db, id),
     getHeader(event, 'origin'),

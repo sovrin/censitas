@@ -8,7 +8,7 @@ import {
   type SiteReport,
   type SiteSummary,
 } from '../../shared/contracts'
-import { transaction } from './database'
+import { transaction } from '#nexitas/server/core/database'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -105,12 +105,14 @@ export function siteSummaries(
   })
 }
 
-/** Every event counted today, across sites. */
-export function countToday(db: DatabaseSync, now = Date.now()) {
+/** Every event counted today, across sites or for one. */
+export function countToday(db: DatabaseSync, now = Date.now(), site?: string) {
   return (
     db
-      .prepare("SELECT coalesce(sum(count), 0) AS count FROM counts WHERE prop = '' AND day = ?")
-      .get(dayOf(now)) as { count: number }
+      .prepare(
+        "SELECT coalesce(sum(count), 0) AS count FROM counts WHERE prop = '' AND day = ? AND (? IS NULL OR site = ?)",
+      )
+      .get(dayOf(now), site ?? null, site ?? null) as { count: number }
   ).count
 }
 

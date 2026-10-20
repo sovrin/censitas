@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { formatCompact, formatCount, formatDay } from '~/lib/format'
+import { formatCompact, formatCount, formatDay } from '../lib/format'
 
 /** <ColumnChart :name :days :daily size="l" />
  *  One event's counts per day as columns, oldest on the left, on a scale with three gridlines.

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { sitesFileSchema, type SiteSummary, type SitesFile } from '#shared/contracts'
-import { errorMessage, formatCount, formatDelta } from '~/lib/format'
-useHead({ title: 'Sites · censitas' })
+import { sitesFileSchema, type SiteSummary, type SitesFile } from '../../../shared/contracts'
+import { errorMessage } from '#nexitas/app/lib/format'
+import { formatCount, formatDelta } from '../../lib/format'
+// Usage across every project that counts, each against the 30 days before.
+useHead({ title: `Usage · ${useRuntimeConfig().public.nexitas.name}` })
 const { data, error, refresh } = await useFetch<SiteSummary[]>('/api/sites')
 useLive(refresh)
 
@@ -72,7 +74,7 @@ const list = (ids: string[]) => ids.join(', ')
 
 <template>
   <div class="stack gap-5">
-    <h1 class="sr-only">Sites</h1>
+    <h1 class="sr-only">Usage</h1>
     <div v-if="error" class="alert" data-tone="danger" role="alert">
       <div><strong>Could not load the sites.</strong> {{ errorMessage(error) }}</div>
       <button type="button" class="btn" data-size="s" @click="refresh()">Try again</button>
@@ -145,13 +147,14 @@ const list = (ids: string[]) => ids.join(', ')
         </li>
       </ul>
       <p v-else class="text-muted">
-        No sites yet. Add one to get the tracker to put in it, or import a sites file.
+        Nothing counts yet. Switch on usage on a project's page to get its tracker, or import a
+        sites file.
       </p>
       <p v-if="data.length" class="text-s text-muted">
         The last 30 days, each against the 30 before.
       </p>
       <div class="cluster gap-4">
-        <NuxtLink to="/sites/new" class="link">Add a site</NuxtLink>
+        <NuxtLink to="/projects/new" class="link">Add a project</NuxtLink>
         <span class="cluster gap-3 text-s end">
           <button type="button" class="link" data-quiet @click="fileInput?.click()">Import</button>
           <!-- Settings only: what each site may send, never its counts. -->

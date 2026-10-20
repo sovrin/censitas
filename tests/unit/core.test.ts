@@ -12,8 +12,10 @@ import {
   siteReport,
   siteSummaries,
 } from '../../server/core/counts'
-import { openDatabase } from '../../server/core/database'
-import { createLimiter, isBot, senderNetwork } from '../../server/core/limits'
+import { openDatabase } from '#nexitas/server/core/database'
+import { createProject, deleteProject, getProject } from '#nexitas/server/core/projects'
+import { isBot } from '../../server/core/limits'
+import { censitas } from '../../server/core/module'
 import {
   acceptBeacon,
   createSite,
@@ -22,6 +24,7 @@ import {
   getSite,
   importSites,
   listSites,
+  SiteConflict,
   updateSite,
 } from '../../server/core/sites'
 
@@ -30,16 +33,16 @@ const NOW = Date.UTC(2026, 9, 19, 12)
 const dirs: string[] = []
 const dbs: DatabaseSync[] = []
 
-function database() {
+function database(modules = [censitas]) {
   const dir = mkdtempSync(join(tmpdir(), 'censitas-test-'))
   dirs.push(dir)
-  const db = openDatabase(dir)
+  const db = openDatabase(join(dir, 'censitas.sqlite'), modules)
   dbs.push(db)
   return db
 }
 
 afterEach(() => {
-  for (const db of dbs.splice(0)) db.close()
+  for (const db of dbs.splice(0)) if (db.isOpen) db.close()
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
@@ -52,6 +55,12 @@ const sonotas: SiteConfig = siteConfigSchema.parse({
   },
 })
 const ORIGIN = 'https://sonotas.example.com'
+/** sonotas as a project of nexitas, counted by censitas. */
+function addSonotas(db: DatabaseSync) {
+  createProject(db, { id: 'sonotas', name: 'sonotas', origins: sonotas.origins })
+  return createSite(db, 'sonotas', sonotas.events)
+}
+const stored = (site: typeof sonotas) => ({ ...site, projectId: site.id })
 const findSite = (id: string) => (id === sonotas.id ? sonotas : null)
 const beacon = (body: object, origin: string | undefined = ORIGIN) =>
   acceptBeacon(findSite, origin, JSON.stringify(body))
@@ -73,29 +82,42 @@ describe('site settings', () => {
 
   it('are stored, listed, changed, and deleted with their counts', () => {
     const db = database()
-    expect(createSite(db, sonotas)).toBe(true)
-    expect(createSite(db, sonotas)).toBe(false)
-    expect(getSite(db, 'sonotas')).toEqual(sonotas)
+    expect(addSonotas(db)).toBe(true)
+    expect(createSite(db, 'sonotas', sonotas.events)).toBe(false)
+    expect(getSite(db, 'sonotas')).toEqual(stored(sonotas))
     const changed = { ...sonotas, events: { pageview: {}, 'link-copy': {} } }
-    expect(updateSite(db, 'sonotas', changed)).toBe(true)
-    expect(listSites(db)).toEqual([changed])
+    expect(updateSite(db, 'sonotas', changed.events)).toBe(true)
+    expect(listSites(db)).toEqual([stored(changed)])
     countEvent(db, 'sonotas', 'pageview', {}, NOW)
     countEvent(db, 'other', 'pageview', {}, NOW)
     expect(deleteSite(db, 'sonotas')).toBe(true)
     expect(getSite(db, 'sonotas')).toBeNull()
     expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
   })
+
+  it('take their origins from the project, and go when it does', () => {
+    const db = database()
+    addSonotas(db)
+    expect(censitas.projectStatus!(db, 'sonotas')).toEqual([
+      { text: 'nothing yet today', to: '/sites/sonotas' },
+    ])
+    expect(censitas.projectStatus!(db, 'other')).toEqual([])
+    countEvent(db, 'sonotas', 'pageview', {})
+    deleteProject(db, 'sonotas', [censitas])
+    expect(getSite(db, 'sonotas')).toBeNull()
+    expect(db.prepare('SELECT site FROM counts').all()).toEqual([])
+  })
 })
 
 describe('deleting counts', () => {
   it("clears a site's counts and refusals, keeping the site and other sites' data", () => {
     const db = database()
-    createSite(db, sonotas)
+    addSonotas(db)
     countEvent(db, 'sonotas', 'load', { source: 'demo' }, NOW)
     countRefusal(db, 'sonotas', 'value', NOW)
     countEvent(db, 'other', 'pageview', {}, NOW)
     expect(deleteCounts(db, 'sonotas')).toBe(3)
-    expect(getSite(db, 'sonotas')).toEqual(sonotas)
+    expect(getSite(db, 'sonotas')).toEqual(stored(sonotas))
     expect(siteReport(db, sonotas, 7, NOW).events.every((event) => !event.total)).toBe(true)
     expect(siteReport(db, sonotas, 7, NOW).refused.total).toBe(0)
     expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
@@ -105,13 +127,32 @@ describe('deleting counts', () => {
 describe('sites files', () => {
   it('import new sites and replace existing settings, keeping counts', () => {
     const db = database()
-    createSite(db, sonotas)
+    addSonotas(db)
     countEvent(db, 'sonotas', 'pageview', {}, NOW)
-    const changed = { ...sonotas, events: { pageview: {}, 'link-copy': {} } }
+    const changed = {
+      ...sonotas,
+      origins: ['https://www.sonotas.example.com'],
+      events: { pageview: {}, 'link-copy': {} },
+    }
     const other = { ...sonotas, id: 'other' }
     expect(importSites(db, [changed, other])).toEqual({ added: ['other'], replaced: ['sonotas'] })
-    expect(listSites(db)).toEqual([other, changed])
+    expect(listSites(db)).toEqual([stored(other), stored(changed)])
+    // The file's origins are the project's now, for every module; its name stays.
+    expect(getProject(db, 'sonotas')).toEqual({
+      id: 'sonotas',
+      name: 'sonotas',
+      origins: changed.origins,
+    })
     expect(countToday(db, NOW)).toBe(1)
+  })
+
+  it('import nothing when a project counts under another site already', () => {
+    const db = database()
+    addSonotas(db)
+    db.prepare("UPDATE sites SET id = 'sonotas-web'").run()
+    expect(() => importSites(db, [{ ...sonotas, id: 'other' }, sonotas])).toThrow(SiteConflict)
+    expect(listSites(db).map((site) => site.id)).toEqual(['sonotas-web'])
+    expect(getProject(db, 'other')).toBeNull()
   })
 
   it('are refused without the marker, empty or with a site twice', () => {
@@ -177,7 +218,7 @@ describe('beacons', () => {
     expect(beacon({ site: 'sonotas', event: 'load', props: { source: 1 } })).toMatchObject({
       status: 400,
     })
-    expect(beacon({ site: 'sonotas', event: 'x'.repeat(41) })).toMatchObject({ status: 400 })
+    expect(beacon({ site: 'sonotas', event: 'x'.repeat(65) })).toMatchObject({ status: 400 })
   })
 })
 
@@ -195,7 +236,7 @@ describe('refusals', () => {
 
   it('are counted per day and reason, reported over the range, and go with their site', () => {
     const db = database()
-    createSite(db, sonotas)
+    addSonotas(db)
     countRefusal(db, 'sonotas', 'value', NOW)
     countRefusal(db, 'sonotas', 'value', NOW - DAY)
     countRefusal(db, 'sonotas', 'event', NOW - 2 * DAY)
@@ -306,25 +347,6 @@ describe('counters', () => {
 })
 
 describe('limits', () => {
-  it('allow a set number of hits per window, then forget everyone', () => {
-    const limit = createLimiter(3, 60_000)
-    for (let i = 0; i < 3; i++) expect(limit.hit('a', 1000)).toBe(true)
-    expect(limit.allows('a', 2000)).toBe(false)
-    expect(limit.hit('a', 2000)).toBe(false)
-    expect(limit.hit('b', 2000)).toBe(true)
-    expect(limit.allows('a', 61_000)).toBe(true)
-    expect(limit.hit('a', 61_000)).toBe(true)
-  })
-
-  it('count an IPv6 sender by its /64, and IPv4 as it is', () => {
-    expect(senderNetwork('2001:db8:1:2:a:b:c:d')).toBe('2001:db8:1:2::/64')
-    expect(senderNetwork('2001:db8:1:2::5')).toBe('2001:db8:1:2::/64')
-    expect(senderNetwork('2001:DB8::5')).toBe('2001:db8:0:0::/64')
-    expect(senderNetwork('fe80::1%eth0')).toBe('fe80:0:0:0::/64')
-    expect(senderNetwork('203.0.113.7')).toBe('203.0.113.7')
-    expect(senderNetwork('::ffff:203.0.113.7')).toBe('203.0.113.7')
-  })
-
   it('tell bots from browsers', () => {
     expect(isBot(undefined)).toBe(true)
     expect(isBot('')).toBe(true)

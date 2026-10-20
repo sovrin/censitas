@@ -3,18 +3,26 @@
 How your sites are used, counted, not who uses them. Load one script, send a few named events,
 read daily counts.
 
-censitas is one small service: a tracker that sites load by URL, a public endpoint its beacons go
-to, and a private dashboard for the owner. It stores only counters (site, UTC day, event, prop
-value, count) and nothing that could tell one visitor from another. It is Nuxt, SQLite through
-`node:sqlite` and aequitas for every pixel, behind your own reverse proxy.
+**censitas is a module for [nexitas](https://github.com/sovrin/nexitas), not an app of its own.** It ships inside
+nexitas, which builds it in from its `modules.json`, and an install's owner
+switches it on as Usage. An install that leaves it off counts nothing at all. To use it, install
+nexitas. nexitas brings the sign-in, the page shell, the database and the projects (each site's
+name and origins); censitas adds:
+
+- a tracker that a project's pages load by URL, and the public endpoint its beacons go to;
+- the usage pages: every site's daily counts and the share of each prop value;
+- a Usage panel on each project's page: start counting, today's figure, the tracker snippet.
+
+It stores only counters (site, UTC day, event, prop value, count) and nothing that could tell one
+visitor from another.
 
 ## How it fits together
 
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
                      ── POST /v1/e                   → one event, counted if its site allows it
-owner               ── /                             sites, daily counts, breakdowns, settings
-(signed in)
+owner               ── /projects/<id>                a project's usage panel and tracker (nexitas)
+(signed in)         ── /sites                        usage across sites, daily counts, breakdowns
                      ── GET  /api/events             → live: "something changed", every 3 s at most
 ```
 
@@ -67,7 +75,7 @@ the page never waits on it, and let `track()` do nothing until it has loaded:
 ```js
 // Counting is optional: until track.js has loaded, or if it never does, track() does nothing.
 let track = () => {}
-import('https://censitas.example.com/v1/track.js?site=sonotas').then(
+import('https://nexitas.example.com/v1/track.js?site=sonotas').then(
   (module) => (track = module.track),
   () => {},
 )
@@ -86,13 +94,15 @@ In a Nuxt or Vite app, the URL is external, so mark the import `/* @vite-ignore 
 
 ## Sites
 
-Sites are configured in the dashboard (Sites → Add a site), each with:
+A site is a nexitas project that counts: Count usage on the project's page starts it. Each has:
 
-- **an id**, which the tracker is imported with (`?site=sonotas`) and which never changes;
-- **origins**, the sites that may send, matched exactly against each beacon's `Origin`;
+- **an id**, the project's, which the tracker is imported with (`?site=sonotas`) and which never
+  changes;
+- **origins**, the project's, set on its page and shared by every module, matched exactly against
+  each beacon's `Origin`;
 - **events**: every event the site sends, each with the props it may carry and every value each
   prop may take. A new site starts with `pageview`, which the tracker sends on import. Names are
-  lowercase with dashes, props letters and digits, values up to 40 of letters, digits and
+  lowercase with dashes, props letters and digits, values up to 64 of letters, digits and
   `. : + - _`.
 
 A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals
@@ -103,7 +113,8 @@ applies from the next beacon on. The site's settings page shows the snippet to p
 Delete counts (on the settings page) starts a site over from zero, after testing for example, and
 keeps its settings and tracker; deleting the site deletes its counts with it.
 
-**Import and export** (under the sites list) move settings, never counts, as one JSON file:
+**Import and export** (under Usage) move settings, never counts, as one JSON file. A file's origins
+become its project's, for every module; a site whose project does not exist yet gets one:
 
 ```json
 {
@@ -133,57 +144,33 @@ rate.
 
 ## Develop
 
-Node 24+ and pnpm 11. aequitas is not published yet: check it out next to this repository and
-build it once (`cd ../aequitas && pnpm install && pnpm build`), or point `AEQUITAS_DIST` at
-another built `dist/`.
+censitas has no app, build or image of its own: it runs inside nexitas. Check out nexitas,
+aequitas and censitas next to each other, build aequitas once
+(`cd ../aequitas && pnpm install && pnpm build`), and put this checkout into nexitas' modules:
 
 ```sh
 pnpm install
-pnpm dev
+ln -s ../../censitas ../nexitas/.modules/censitas
+cd ../nexitas && pnpm modules && pnpm install && pnpm dev
 ```
 
-Open http://localhost:3100. On first run the launcher writes a random installation key to
-`.data/bootstrap-token`; use it to create the owner account. `PORT` moves the dev server. Forgot
-the password? `pnpm owner:reset --confirm` (with `CENSITAS_DATA_DIR` pointing at the data) removes
-the owner and every session, keeps sites and counts, and lets you set up again with the key.
+`pnpm modules` fetches the other modules nexitas lists and leaves the symlink to this checkout as
+it is. Open http://localhost:3000, create the owner with the key in nexitas' `.data/bootstrap-token`,
+and switch Usage on, at setup or under Modules. The typecheck of the pages and server runs in
+nexitas (`pnpm check` there); here `pnpm check` covers the tracker and the unit tests.
 
-## Run with Docker Compose
+## In an install
 
-Copy `.env.example` to `.env`, set `CENSITAS_BOOTSTRAP_TOKEN` (`openssl rand -hex 32`) and the
-public address, `CENSITAS_ORIGIN=https://censitas.example.com`: the dashboard only accepts changes
-sent from there. Then:
-
-```sh
-docker compose up -d --build
-```
-
-The web service listens on `127.0.0.1:3100` (`CENSITAS_BIND`). TLS and the public address belong
-to your reverse proxy: put it, or the network it shares, in an untracked `compose.override.yaml`.
-Open the address and create the owner account with the installation key; only one owner exists,
-and its session cookie is `Secure` on HTTPS. The proxy must append the caller's address to
-`X-Forwarded-For`; the rate limit counts senders by its last entry. Keep it from logging requests
-to `/v1/e` too, or it stores the addresses censitas drops. With Caddy, which logs nothing unless
-told to:
-
-```
-censitas.example.com {
-	reverse_proxy 127.0.0.1:3100
-	header Strict-Transport-Security "max-age=31536000"
-}
-```
-
-Put nothing else (a CDN) in front of the proxy without changing how the sender is read. The image
-runs as an unprivileged user on Alpine with only the node binary.
-
-Sites and counters live in the `censitas-data` volume (`censitas.sqlite`); back it up and never
-`docker compose down -v`. They hold no personal data, so they are kept until you delete them.
+censitas runs wherever nexitas does: see nexitas' README for Compose, the proxy and the settings.
+Keep the proxy from logging requests to `/v1/e`, or it stores the addresses censitas drops. Sites
+and counters hold no personal data, so they are kept until you delete them. Off (under Modules),
+its pages and `/v1/e` answer 404 and nothing is counted; its counts are kept.
 
 ## Checks
 
 ```sh
-pnpm check         # typecheck (app, server, tracker) and unit tests
+pnpm check         # the tracker's typecheck and the unit tests
 pnpm lint
 pnpm format:check
-pnpm build
-node ../aequitas/dist/aequitas-check.mjs --css app/assets/app.css app/**/*.vue
+node ../aequitas/dist/aequitas-check.mjs --css app/assets/app.css --css ../nexitas/app/assets/nexitas.css app/**/*.vue
 ```

@@ -1,37 +1,12 @@
-// Every rule about what censitas accepts lives here, shared by the dashboard and the server.
+// Every rule about what censitas accepts lives here, shared by the dashboard and the server. The
+// owner's sign-in and what an origin is are nexitas' rules.
 import { z } from 'zod'
+import { originsSchema } from '#nexitas/shared/contracts'
 
-/** Scheme, host and port only, as a browser sends it in the Origin header. */
-export function isOrigin(value: string) {
-  try {
-    const url = new URL(value)
-    return ['http:', 'https:'].includes(url.protocol) && url.origin === value
-  } catch {
-    return false
-  }
-}
-
-export const ownerCredentialsSchema = z
-  .object({
-    email: z
-      .email()
-      .max(254)
-      .transform((value) => value.toLowerCase()),
-    password: z.string().min(12, 'Use at least 12 characters.').max(256),
-  })
-  .strict()
-
-export const setupSchema = ownerCredentialsSchema.extend({ token: z.string().min(32).max(256) })
-
-export interface AuthStatus {
-  setupRequired: boolean
-  owner: { email: string } | null
-}
-
-const NAME = /^[a-z][a-z0-9-]{0,39}$/
+const NAME = /^[a-z][a-z0-9-]{0,63}$/
 const PROP = /^[a-z][a-zA-Z0-9]{0,31}$/
 // A value is a word from a short list the site owner wrote down, never free text from a page.
-const VALUE = /^[\w.:+-]{1,40}$/
+const VALUE = /^[\w.:+-]{1,64}$/
 
 export const siteIdSchema = z.string().regex(NAME, 'Use lowercase letters, digits and dashes.')
 
@@ -51,31 +26,40 @@ export const eventRulesSchema = keyed(
   z
     .array(z.string().regex(VALUE, 'Use letters, digits and . : + - _ in a value.'))
     .min(1, 'List at least one value.')
-    .max(50)
+    .max(64)
     .refine((values) => new Set(values).size === values.length, 'Each value once.'),
-).refine((props) => Object.keys(props).length <= 10, 'At most 10 props.')
+).refine((props) => Object.keys(props).length <= 16, 'At most 16 props.')
 export type EventRules = z.infer<typeof eventRulesSchema>
 
-/** A site and everything it may send. Only what is listed here is counted. */
+/** Every event a site may send. Only what is listed here is counted. */
+export const siteEventsSchema = keyed(
+  NAME,
+  'Use lowercase letters, digits and dashes.',
+  eventRulesSchema,
+)
+  .refine((events) => Object.keys(events).length >= 1, 'List at least one event.')
+  .refine((events) => Object.keys(events).length <= 64, 'At most 64 events.')
+
+/** What can change about a site: its events. Who may send is its project's origins. */
+export const siteSettingsSchema = z.object({ events: siteEventsSchema }).strict()
+
+/** Counting for a project: its site takes the project's id, which the tracker then names. */
+export const newSiteSchema = siteSettingsSchema.extend({ projectId: z.string().max(64) }).strict()
+
+/** A site as a sites file holds it: with the origins of its project, so a file stays complete. */
 export const siteConfigSchema = z
   .object({
     id: siteIdSchema,
-    origins: z
-      .array(
-        z
-          .string()
-          .trim()
-          .transform((value) => value.replace(/\/$/, ''))
-          .refine(isOrigin, 'Enter an origin like https://sonotas.example.com, without a path.'),
-      )
-      .min(1, 'Add the site that sends.')
-      .max(10),
-    events: keyed(NAME, 'Use lowercase letters, digits and dashes.', eventRulesSchema)
-      .refine((events) => Object.keys(events).length >= 1, 'List at least one event.')
-      .refine((events) => Object.keys(events).length <= 50, 'At most 50 events.'),
+    origins: originsSchema,
+    events: siteEventsSchema,
   })
   .strict()
 export type SiteConfig = z.infer<typeof siteConfigSchema>
+
+/** A site as stored: its settings, the project it counts for, and that project's origins. */
+export interface Site extends SiteConfig {
+  projectId: string
+}
 
 /** A file of sites, as the dashboard exports and imports them: settings only, never counts. */
 export const sitesFileSchema = z
@@ -84,7 +68,7 @@ export const sitesFileSchema = z
     sites: z
       .array(siteConfigSchema)
       .min(1, 'The file holds no sites.')
-      .max(100)
+      .max(128)
       .refine(
         (sites) => new Set(sites.map((site) => site.id)).size === sites.length,
         'Each site once.',
@@ -96,9 +80,9 @@ export type SitesFile = z.infer<typeof sitesFileSchema>
 /** What track.js sends. Names, props and values are checked against the site afterwards. */
 export const beaconSchema = z
   .object({
-    site: z.string().max(40),
-    event: z.string().max(40),
-    props: z.record(z.string().max(32), z.string().max(40)).optional(),
+    site: z.string().max(64),
+    event: z.string().max(64),
+    props: z.record(z.string().max(32), z.string().max(64)).optional(),
   })
   .strict()
 export type Beacon = z.infer<typeof beaconSchema>
@@ -143,4 +127,10 @@ export interface SiteReport {
   /** Every day of the range, newest first. */
   days: string[]
   events: EventReport[]
+}
+
+/** A project's usage, for its panel: its site, if it counts, and today's events. */
+export interface ProjectUsage {
+  site: Site | null
+  today: number
 }
