@@ -177,7 +177,7 @@ describe('beacons', () => {
     expect(beacon({ site: 'sonotas', event: 'load', props: { source: 1 } })).toMatchObject({
       status: 400,
     })
-    expect(beacon({ site: 'sonotas', event: 'x'.repeat(41) })).toMatchObject({ status: 400 })
+    expect(beacon({ site: 'sonotas', event: 'x'.repeat(65) })).toMatchObject({ status: 400 })
   })
 })
 

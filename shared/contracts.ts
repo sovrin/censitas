@@ -28,10 +28,10 @@ export interface AuthStatus {
   owner: { email: string } | null
 }
 
-const NAME = /^[a-z][a-z0-9-]{0,39}$/
+const NAME = /^[a-z][a-z0-9-]{0,63}$/
 const PROP = /^[a-z][a-zA-Z0-9]{0,31}$/
 // A value is a word from a short list the site owner wrote down, never free text from a page.
-const VALUE = /^[\w.:+-]{1,40}$/
+const VALUE = /^[\w.:+-]{1,64}$/
 
 export const siteIdSchema = z.string().regex(NAME, 'Use lowercase letters, digits and dashes.')
 
@@ -51,9 +51,9 @@ export const eventRulesSchema = keyed(
   z
     .array(z.string().regex(VALUE, 'Use letters, digits and . : + - _ in a value.'))
     .min(1, 'List at least one value.')
-    .max(50)
+    .max(64)
     .refine((values) => new Set(values).size === values.length, 'Each value once.'),
-).refine((props) => Object.keys(props).length <= 10, 'At most 10 props.')
+).refine((props) => Object.keys(props).length <= 16, 'At most 16 props.')
 export type EventRules = z.infer<typeof eventRulesSchema>
 
 /** A site and everything it may send. Only what is listed here is counted. */
@@ -69,10 +69,10 @@ export const siteConfigSchema = z
           .refine(isOrigin, 'Enter an origin like https://sonotas.example.com, without a path.'),
       )
       .min(1, 'Add the site that sends.')
-      .max(10),
+      .max(16),
     events: keyed(NAME, 'Use lowercase letters, digits and dashes.', eventRulesSchema)
       .refine((events) => Object.keys(events).length >= 1, 'List at least one event.')
-      .refine((events) => Object.keys(events).length <= 50, 'At most 50 events.'),
+      .refine((events) => Object.keys(events).length <= 64, 'At most 64 events.'),
   })
   .strict()
 export type SiteConfig = z.infer<typeof siteConfigSchema>
@@ -84,7 +84,7 @@ export const sitesFileSchema = z
     sites: z
       .array(siteConfigSchema)
       .min(1, 'The file holds no sites.')
-      .max(100)
+      .max(128)
       .refine(
         (sites) => new Set(sites.map((site) => site.id)).size === sites.length,
         'Each site once.',
@@ -96,9 +96,9 @@ export type SitesFile = z.infer<typeof sitesFileSchema>
 /** What track.js sends. Names, props and values are checked against the site afterwards. */
 export const beaconSchema = z
   .object({
-    site: z.string().max(40),
-    event: z.string().max(40),
-    props: z.record(z.string().max(32), z.string().max(40)).optional(),
+    site: z.string().max(64),
+    event: z.string().max(64),
+    props: z.record(z.string().max(32), z.string().max(64)).optional(),
   })
   .strict()
 export type Beacon = z.infer<typeof beaconSchema>

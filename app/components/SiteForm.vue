@@ -109,7 +109,7 @@ async function save() {
             class="input font-mono text-s"
             data-size="s"
             required
-            maxlength="40"
+            maxlength="64"
             placeholder="sonotas"
             autocomplete="off"
             spellcheck="false"

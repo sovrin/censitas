@@ -92,7 +92,7 @@ Sites are configured in the dashboard (Sites → Add a site), each with:
 - **origins**, the sites that may send, matched exactly against each beacon's `Origin`;
 - **events**: every event the site sends, each with the props it may carry and every value each
   prop may take. A new site starts with `pageview`, which the tracker sends on import. Names are
-  lowercase with dashes, props letters and digits, values up to 40 of letters, digits and
+  lowercase with dashes, props letters and digits, values up to 64 of letters, digits and
   `. : + - _`.
 
 A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals
