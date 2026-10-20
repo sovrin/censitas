@@ -10,22 +10,28 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: censitas
-      # aequitas is unpublished: check it out next to censitas and build its dist/.
+      # aequitas and nexitas are unpublished: check them out next to censitas. The tests import the
+      # core from nexitas' sources; its install skips preparing the app, which needs every module.
+      # The app itself is typechecked and built in nexitas' checks.
       - uses: actions/checkout@v4
         with:
           repository: sovrin/aequitas
           path: aequitas
+      - uses: actions/checkout@v4
+        with:
+          repository: sovrin/nexitas
+          path: nexitas
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - run: npm install --global pnpm@11.15.1
       - run: pnpm install --frozen-lockfile && pnpm build
         working-directory: aequitas
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+        working-directory: nexitas
       - run: pnpm install --frozen-lockfile
         working-directory: censitas
       - run: pnpm check
         working-directory: censitas
       - run: pnpm lint && pnpm format:check
-        working-directory: censitas
-      - run: pnpm build
         working-directory: censitas

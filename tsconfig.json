@@ -1,9 +1,10 @@
 {
+  // censitas is built inside nexitas, which generates the types for it and its modules.
   "files": [],
   "references": [
-    { "path": "./.nuxt/tsconfig.app.json" },
-    { "path": "./.nuxt/tsconfig.server.json" },
-    { "path": "./.nuxt/tsconfig.shared.json" },
-    { "path": "./.nuxt/tsconfig.node.json" }
+    { "path": "../nexitas/.nuxt/tsconfig.app.json" },
+    { "path": "../nexitas/.nuxt/tsconfig.server.json" },
+    { "path": "../nexitas/.nuxt/tsconfig.shared.json" },
+    { "path": "../nexitas/.nuxt/tsconfig.node.json" }
   ]
 }

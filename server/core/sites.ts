@@ -1,51 +1,74 @@
-// The sites censitas counts for, and what each one may send.
+// The sites censitas counts for, one per project, and what each one may send. Who may send is the
+// project's: its origins, which every module of the project shares.
 import type { DatabaseSync } from 'node:sqlite'
-import { beaconSchema, type Refusal, type SiteConfig } from '../../shared/contracts'
-import { transaction } from './database'
+import { beaconSchema, type Refusal, type Site, type SiteConfig } from '../../shared/contracts'
+import { transaction } from '#nexitas/server/core/database'
+import { createProject, getProject, updateProject } from '#nexitas/server/core/projects'
 
 interface SiteRow {
   id: string
+  project_id: string
   origins: string
   events: string
 }
 
-const toConfig = (row: SiteRow): SiteConfig => ({
+const toSite = (row: SiteRow): Site => ({
   id: row.id,
+  projectId: row.project_id,
   origins: JSON.parse(row.origins),
   events: JSON.parse(row.events),
 })
 
-export function listSites(db: DatabaseSync): SiteConfig[] {
-  return (db.prepare('SELECT * FROM sites ORDER BY id').all() as unknown as SiteRow[]).map(toConfig)
+const SELECT = `SELECT sites.id, sites.project_id, sites.events, coalesce(projects.origins, '[]') AS origins
+  FROM sites LEFT JOIN projects ON projects.id = sites.project_id`
+
+export function listSites(db: DatabaseSync): Site[] {
+  return (db.prepare(`${SELECT} ORDER BY sites.id`).all() as unknown as SiteRow[]).map(toSite)
 }
 
-export function getSite(db: DatabaseSync, id: string): SiteConfig | null {
-  const row = db.prepare('SELECT * FROM sites WHERE id = ?').get(id) as SiteRow | undefined
-  return row ? toConfig(row) : null
+export function getSite(db: DatabaseSync, id: string): Site | null {
+  const row = db.prepare(`${SELECT} WHERE sites.id = ?`).get(id) as SiteRow | undefined
+  return row ? toSite(row) : null
 }
 
-/** False when a site with this id exists already. */
-export function createSite(db: DatabaseSync, site: SiteConfig, now = Date.now()) {
+export function getProjectSite(db: DatabaseSync, projectId: string): Site | null {
+  const row = db.prepare(`${SELECT} WHERE sites.project_id = ?`).get(projectId) as
+    | SiteRow
+    | undefined
+  return row ? toSite(row) : null
+}
+
+/** Starts counting for a project, under its id. False when it counts already, or a site has the
+ *  id. */
+export function createSite(
+  db: DatabaseSync,
+  projectId: string,
+  events: SiteConfig['events'],
+  now = Date.now(),
+) {
   return (
     db
       .prepare(
-        `INSERT OR IGNORE INTO sites (id, origins, events, created_at, updated_at)
+        `INSERT OR IGNORE INTO sites (id, project_id, events, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(site.id, JSON.stringify(site.origins), JSON.stringify(site.events), now, now).changes ===
-    1
+      .run(projectId, projectId, JSON.stringify(events), now, now).changes === 1
   )
 }
 
 /** The id never changes: the tracker in the site's pages names it. */
-export function updateSite(db: DatabaseSync, id: string, site: SiteConfig, now = Date.now()) {
+export function updateSite(
+  db: DatabaseSync,
+  id: string,
+  events: SiteConfig['events'],
+  now = Date.now(),
+) {
   return (
     db
-      .prepare('UPDATE sites SET origins = ?, events = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(site.origins), JSON.stringify(site.events), now, id).changes === 1
+      .prepare('UPDATE sites SET events = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(events), now, id).changes === 1
   )
 }
-
 /** Deletes every count and refusal a site has, keeping the site: it counts again from zero.
  *  Returns how many rows went. */
 export function deleteCounts(db: DatabaseSync, id: string) {
@@ -59,25 +82,38 @@ export function deleteCounts(db: DatabaseSync, id: string) {
 
 /** Deletes the site and every count it has. */
 export function deleteSite(db: DatabaseSync, id: string) {
-  return transaction(db, () => {
-    db.prepare('DELETE FROM counts WHERE site = ?').run(id)
-    db.prepare('DELETE FROM refusals WHERE site = ?').run(id)
-    return db.prepare('DELETE FROM sites WHERE id = ?').run(id).changes === 1
-  })
+  return transaction(db, () => removeSite(db, id))
 }
 
+/** deleteSite for a caller inside a transaction already, as the core's when a project goes. */
+export function removeSite(db: DatabaseSync, id: string) {
+  db.prepare('DELETE FROM counts WHERE site = ?').run(id)
+  db.prepare('DELETE FROM refusals WHERE site = ?').run(id)
+  return db.prepare('DELETE FROM sites WHERE id = ?').run(id).changes === 1
+}
+
+/** An import that would give a project a second site. */
+export class SiteConflict extends Error {}
+
 /** Adds the sites that are new and replaces the settings of those that exist, all or none.
- *  Counts stay as they are. */
+ *  Counts stay as they are. A file's origins become its project's, which changes them for every
+ *  module of that project; a project that does not exist yet is made under the site's id. */
 export function importSites(db: DatabaseSync, sites: SiteConfig[], now = Date.now()) {
   return transaction(db, () => {
     const added: string[] = []
     const replaced: string[] = []
-    for (const site of sites)
-      if (createSite(db, site, now)) added.push(site.id)
-      else {
-        updateSite(db, site.id, site, now)
+    for (const entry of sites) {
+      const site = getSite(db, entry.id)
+      const projectId = site?.projectId ?? entry.id
+      const project = getProject(db, projectId)
+      if (project) updateProject(db, projectId, { name: project.name, origins: entry.origins }, now)
+      else createProject(db, { id: projectId, name: projectId, origins: entry.origins }, now)
+      if (site) {
+        updateSite(db, site.id, entry.events, now)
         replaced.push(site.id)
-      }
+      } else if (createSite(db, projectId, entry.events, now)) added.push(entry.id)
+      else throw new SiteConflict(`The project ${projectId} counts under another site already.`)
+    }
     return { added, replaced }
   })
 }
@@ -122,6 +158,7 @@ export function acceptBeacon(
     refusal: { site: id, reason },
   })
   // A browser always sends Origin on a cross-site beacon; anything else did not come from the site.
+  // The origins are its project's, read with the site.
   if (!origin || !site.origins.includes(origin))
     return refuse(403, 'This site may not send events here.', 'origin')
   const rules = Object.hasOwn(site.events, event) ? site.events[event] : undefined

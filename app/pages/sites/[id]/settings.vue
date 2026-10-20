@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { SiteConfig } from '#shared/contracts'
-import { errorMessage } from '~/lib/format'
+import type { Site } from '../../../../shared/contracts'
+import { errorMessage } from '#nexitas/app/lib/format'
+import { trackerSnippet } from '../../../lib/embed'
 
 const route = useRoute()
 const id = route.params.id as string
-const { data: site, error, refresh } = await useFetch<SiteConfig>(`/api/sites/${id}`)
-useHead({ title: `${id} settings · censitas` })
+const { data: site, error, refresh } = await useFetch<Site>(`/api/sites/${id}`)
+useHead({ title: `${id} settings · ${useRuntimeConfig().public.nexitas.name}` })
 
 const savedNotice = ref(false)
 async function saved() {
@@ -13,25 +14,7 @@ async function saved() {
   savedNotice.value = true
 }
 
-// What a site puts in its code to count: the tracker, loaded in the background, and a track()
-// that does nothing until it has loaded.
-const origin = useRequestURL().origin
-const embed = computed(() =>
-  [
-    `const TRACKER = '${origin}/v1/track.js?site=${id}'`,
-    'let track = () => {}',
-    'import(/* @vite-ignore */ TRACKER).then(',
-    '  (module) => (track = module.track),',
-    '  () => {},',
-    ')',
-  ].join('\n'),
-)
-const copied = ref(false)
-async function copy() {
-  await navigator.clipboard.writeText(embed.value)
-  copied.value = true
-  setTimeout(() => (copied.value = false), 2000)
-}
+const embed = trackerSnippet(useRequestURL().origin, id)
 
 // Two things can go, each behind typing the site's id: its counts alone, or the whole site.
 type Removal = 'counts' | 'site'
@@ -49,7 +32,8 @@ const REMOVALS = {
   },
   site: {
     title: `Delete ${id} and its counts?`,
-    description: 'This cannot be undone.',
+    description:
+      'The project stays; it just stops counting, and the tracker in it is refused. This cannot be undone.',
     confirm: 'Delete site',
   },
 } as const
@@ -64,7 +48,8 @@ async function remove() {
   try {
     if (removal.value === 'site') {
       await $fetch(`/api/sites/${id}/delete`, { method: 'POST', body: {} })
-      await navigateTo('/')
+      // The project stays, with its other modules; it just no longer counts.
+      await navigateTo(`/projects/${site.value?.projectId ?? ''}`)
       return
     }
     await $fetch(`/api/sites/${id}/counts/delete`, { method: 'POST', body: {} })
@@ -79,7 +64,7 @@ async function remove() {
   <div>
     <nav aria-label="Breadcrumb" class="mb-5">
       <ol class="breadcrumb">
-        <li><NuxtLink to="/">All sites</NuxtLink></li>
+        <li><NuxtLink to="/sites">Usage</NuxtLink></li>
         <li class="font-mono">
           <NuxtLink :to="`/sites/${id}`">{{ id }}</NuxtLink>
         </li>
@@ -99,22 +84,8 @@ async function remove() {
       <SiteForm :key="JSON.stringify(site)" :site="site" @saved="saved" />
 
       <section class="stack gap-3" aria-labelledby="embed-title">
-        <div class="cluster justify-between gap-4">
-          <h2 id="embed-title" class="text-s weight-600">Tracker</h2>
-          <button
-            type="button"
-            class="btn"
-            data-icon
-            data-size="s"
-            data-variant="ghost"
-            :aria-label="copied ? 'Copied' : 'Copy the snippet'"
-            :data-tip="copied ? 'Copied' : 'Copy the snippet'"
-            @click="copy"
-          >
-            <i class="icon" :data-icon="copied ? 'check' : 'copy'"></i>
-          </button>
-        </div>
-        <pre class="snippet font-mono text-xs"><code>{{ embed }}</code></pre>
+        <h2 id="embed-title" class="text-s weight-600">Tracker</h2>
+        <EmbedCode :code="embed" caption="JavaScript" />
         <small class="text-muted text-s"
           >Importing it counts a page view; call
           <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the

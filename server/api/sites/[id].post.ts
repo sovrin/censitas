@@ -1,16 +1,16 @@
-import { siteConfigSchema } from '#shared/contracts'
-import { updateSite } from '../../core/sites'
-import { censitasDatabase, routeSite } from '../../utils/censitas'
-import { announceChange } from '../../utils/changes'
-import { invalid } from '../../utils/invalid'
+import { siteSettingsSchema } from '../../../shared/contracts'
+import { getSite, updateSite } from '../../core/sites'
+import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
+import { routeSite } from '../../utils/censitas'
+import { announceChange } from '#nexitas/server/utils/changes'
+import { invalid } from '#nexitas/server/utils/invalid'
 
 export default defineEventHandler(async (event) => {
   const site = routeSite(event)
-  const body = siteConfigSchema.safeParse(await readBody(event))
+  const body = siteSettingsSchema.safeParse(await readBody(event))
   if (!body.success) throw invalid(body.error)
-  if (body.data.id !== site.id)
-    throw createError({ statusCode: 400, statusMessage: 'A site keeps its id.' })
-  updateSite(censitasDatabase(), site.id, body.data)
+  const db = nexitasDatabase()
+  updateSite(db, site.id, body.data.events)
   announceChange()
-  return body.data
+  return getSite(db, site.id)
 })

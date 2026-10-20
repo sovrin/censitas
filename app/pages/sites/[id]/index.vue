@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { RANGES, REFUSALS, type Refusal, type SiteReport } from '#shared/contracts'
-import { errorMessage, formatCount, formatDay, formatDelta } from '~/lib/format'
+import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../shared/contracts'
+import { errorMessage } from '#nexitas/app/lib/format'
+import { formatCount, formatDay, formatDelta } from '../../../lib/format'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const days = computed(() =>
   RANGES.some((range) => String(range) === route.query.days) ? Number(route.query.days) : 30,
 )
-useHead({ title: () => `${id.value} · censitas` })
+useHead({ title: () => `${id.value} · ${useRuntimeConfig().public.nexitas.name}` })
 
 const { data, error, refresh, status } = await useFetch<SiteReport>(
   () => `/api/sites/${id.value}/report`,
@@ -72,7 +73,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
     <div class="cluster justify-between gap-4">
       <nav aria-label="Breadcrumb">
         <ol class="breadcrumb">
-          <li><NuxtLink to="/">All sites</NuxtLink></li>
+          <li><NuxtLink to="/sites">Usage</NuxtLink></li>
           <li aria-current="page" class="font-mono">{{ id }}</li>
         </ol>
       </nav>

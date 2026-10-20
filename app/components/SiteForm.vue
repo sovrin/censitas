@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { SiteConfig } from '#shared/contracts'
-import { errorMessage } from '~/lib/format'
+import type { Site } from '../../shared/contracts'
+import { errorMessage } from '#nexitas/app/lib/format'
 
-/** Adds a site, or changes one: who may send, and every event, prop and value that is counted.
- *  Nothing else is: a beacon with anything not listed here is refused. */
-const props = defineProps<{ site?: SiteConfig }>()
-const emit = defineEmits<{ saved: [SiteConfig] }>()
+/** Changes a site: every event, prop and value that is counted. Nothing else is: a beacon with
+ *  anything not listed here is refused. Who may send is its project's origins, set there. */
+const props = defineProps<{ site: Site }>()
+const emit = defineEmits<{ saved: [Site] }>()
 
 interface PropDraft {
   uid: number
@@ -23,18 +23,13 @@ let uids = 0
 const newProp = (key = '', values = ''): PropDraft => ({ uid: ++uids, key, values })
 const newEvent = (name = '', props: PropDraft[] = []): EventDraft => ({ uid: ++uids, name, props })
 
-const id = ref(props.site?.id ?? '')
-const origins = ref(props.site?.origins.join('\n') ?? '')
 const events = ref<EventDraft[]>(
-  props.site
-    ? Object.entries(props.site.events).map(([name, rules]) =>
-        newEvent(
-          name,
-          Object.entries(rules).map(([key, values]) => newProp(key, values.join(' '))),
-        ),
-      )
-    : // The tracker counts a page view on import, so every site starts with it.
-      [newEvent('pageview')],
+  Object.entries(props.site.events).map(([name, rules]) =>
+    newEvent(
+      name,
+      Object.entries(rules).map(([key, values]) => newProp(key, values.join(' '))),
+    ),
+  ),
 )
 
 const pending = ref(false)
@@ -46,7 +41,7 @@ const fieldError = (path: string) =>
 /** The drafts as the site's events. A name or prop given twice would silently merge, so it is
  *  reported here instead. */
 function toEvents() {
-  const result: SiteConfig['events'] = {}
+  const result: Site['events'] = {}
   const repeated: { path: string; message: string }[] = []
   for (const event of events.value) {
     const name = event.name.trim()
@@ -73,19 +68,11 @@ async function save() {
     return
   }
   pending.value = true
-  const body: SiteConfig = {
-    id: id.value,
-    origins: origins.value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean),
-    events: result,
-  }
   try {
-    const saved = await $fetch<SiteConfig>(
-      props.site ? `/api/sites/${props.site.id}` : '/api/sites',
-      { method: 'POST', body },
-    )
+    const saved = await $fetch<Site>(`/api/sites/${props.site.id}`, {
+      method: 'POST',
+      body: { events: result },
+    })
     emit('saved', saved)
   } catch (cause) {
     const data = (cause as { data?: { data?: { issues?: typeof issues.value } } }).data?.data
@@ -100,46 +87,12 @@ async function save() {
 <template>
   <form class="stack gap-5" @submit.prevent="save">
     <fieldset :disabled="pending" class="stack gap-5">
-      <dl class="properties">
-        <dt><label for="id">Id</label></dt>
-        <dd class="field items-stretch">
-          <input
-            id="id"
-            v-model="id"
-            class="input font-mono text-s"
-            data-size="s"
-            required
-            maxlength="64"
-            placeholder="sonotas"
-            autocomplete="off"
-            spellcheck="false"
-            :readonly="!!site"
-            :aria-invalid="!!fieldError('id') || undefined"
-            aria-describedby="id-help"
-          />
-          <small id="id-help">{{
-            site
-              ? 'Fixed: the tracker in the site names it.'
-              : 'The tracker names it (?site=…). It cannot change later.'
-          }}</small>
-          <span v-if="fieldError('id')" data-error>{{ fieldError('id') }}</span>
-        </dd>
-        <dt><label for="origins">Origins</label></dt>
-        <dd class="field items-stretch">
-          <textarea
-            id="origins"
-            v-model="origins"
-            class="input font-mono text-s"
-            required
-            spellcheck="false"
-            placeholder="https://sonotas.example.com"
-            :aria-invalid="!!fieldError('origins') || undefined"
-            aria-describedby="origins-help"
-          ></textarea>
-          <small id="origins-help">One per line. Only these may send events.</small>
-          <span v-if="fieldError('origins')" data-error>{{ fieldError('origins') }}</span>
-        </dd>
-      </dl>
+      <p class="text-s text-muted">
+        Sent from <span class="font-mono break-words">{{ site.origins.join(' · ') }}</span
+        >: the origins of
+        <NuxtLink :to="`/projects/${site.projectId}`" class="link">its project</NuxtLink>, which
+        every module shares.
+      </p>
 
       <div class="stack gap-4">
         <div class="stack gap-1">
@@ -273,7 +226,7 @@ async function save() {
         :disabled="pending"
         :aria-busy="pending || undefined"
       >
-        {{ site ? 'Save changes' : 'Add site' }}
+        Save changes
       </button>
     </div>
   </form>
