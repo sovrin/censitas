@@ -4,9 +4,8 @@ import { errorMessage } from '#nexitas/app/lib/format'
 import { trackerSnippet } from '../../../../lib/embed'
 
 const project = useProject().id.value
-const { data, error, refresh } = await useFetch<ProjectUsage>(`/api/p/${project}/sites`)
+const { data, error, refresh } = await useProjectFetch<ProjectUsage>('/sites')
 const site = computed(() => data.value?.site)
-useHead({ title: `Settings · ${project}` })
 
 const savedNotice = ref(false)
 async function saved() {
@@ -19,32 +18,14 @@ const origin = useRequestURL().origin
 // Two things can go, each behind typing the project's id: its counts alone, or the whole site.
 type Removal = 'counts' | 'site'
 const removal = ref<Removal>('counts')
-const deleteOpen = ref(false)
 const deleteError = ref('')
 const countsDeleted = ref(false)
-const REMOVALS = {
-  counts: {
-    title: `Delete everything ${project} counted?`,
-    description:
-      'To start over, after testing for example: its counts and refusals go; its settings and the tracker in it stay, and it counts again from zero. This cannot be undone.',
-    confirm: 'Delete counts',
-  },
-  site: {
-    title: `Delete ${project} and its counts?`,
-    description:
-      'It goes with all its counts, and the tracker in it is refused from then on. The project stays; it just stops counting. This cannot be undone.',
-    confirm: 'Delete site',
-  },
-} as const
-function ask(next: Removal) {
+async function remove(next: Removal) {
   removal.value = next
   deleteError.value = ''
   countsDeleted.value = false
-  deleteOpen.value = true
-}
-async function remove() {
   try {
-    if (removal.value === 'site') {
+    if (next === 'site') {
       await $fetch(`/api/p/${project}/sites/delete`, { method: 'POST', body: {} })
       // The project stays, with its other modules; it just no longer counts.
       await navigateTo(`/p/${project}`)
@@ -59,93 +40,59 @@ async function remove() {
 </script>
 
 <template>
-  <div class="stack gap-5">
-    <nav aria-label="Breadcrumb">
-      <ol class="breadcrumb">
-        <li><NuxtLink :to="`/p/${project}/sites`">Usage</NuxtLink></li>
-        <li aria-current="page">Settings</li>
-      </ol>
-    </nav>
+  <AppPage title="Settings" failed="Could not load this site." :error="error">
+    <template v-if="site" #actions>
+      <DangerAction
+        label="Delete counts"
+        :title="`Delete everything ${project} counted?`"
+        :confirm-word="project"
+        @confirm="remove('counts')"
+      >
+        To start over, after testing for example: its counts and refusals go; its settings and the
+        tracker in it stay, and it counts again from zero. This cannot be undone.
+      </DangerAction>
+      <DangerAction
+        label="Delete site"
+        :title="`Delete ${project} and its counts?`"
+        :confirm-word="project"
+        @confirm="remove('site')"
+      >
+        It goes with all its counts, and the tracker in it is refused from then on. The project
+        stays; it just stops counting. This cannot be undone.
+      </DangerAction>
+    </template>
 
-    <div v-if="error" class="alert" data-tone="danger" role="alert">
-      <div><strong>Could not load this site.</strong> {{ errorMessage(error) }}</div>
-    </div>
-    <template v-else-if="site">
-      <div class="page-header">
-        <h1 class="text-xl weight-600">Settings</h1>
-        <div class="cluster gap-2">
-          <button
-            type="button"
-            class="btn"
-            data-size="s"
-            data-variant="ghost"
-            data-tone="danger"
-            @click="ask('counts')"
-          >
-            Delete counts
-          </button>
-          <button
-            type="button"
-            class="btn"
-            data-size="s"
-            data-variant="ghost"
-            data-tone="danger"
-            @click="ask('site')"
-          >
-            Delete site
-          </button>
-        </div>
-      </div>
-      <div v-if="countsDeleted" class="alert" data-tone="success" role="status">
-        <div>
-          <strong>Counts deleted.</strong> <span class="font-mono">{{ project }}</span> counts again
-          from zero.
-        </div>
-      </div>
-      <div v-if="deleteError" class="alert" data-tone="danger" role="alert">
-        <div>
-          <strong>{{
-            removal === 'site' ? 'Could not delete the site.' : 'Could not delete the counts.'
-          }}</strong>
-          {{ deleteError }}
-        </div>
-      </div>
-
-      <!-- What the site may send takes the room; the tracker that sends it sits beside it. -->
-      <div class="with-aside">
-        <section class="stack gap-3 min-w-0" aria-labelledby="events-title">
-          <h2 id="events-title" class="text-s weight-600 hairline-b pb-2">Events</h2>
-          <div v-if="savedNotice" class="alert" data-tone="success" role="status">
-            <div><strong>Saved.</strong> The next event the site sends is checked against it.</div>
-          </div>
-          <SiteForm :key="JSON.stringify(site)" :site="site" @saved="saved" />
-        </section>
-
-        <aside class="stack gap-3" aria-labelledby="embed-title">
-          <h2 id="embed-title" class="text-s weight-600 hairline-b pb-2">Tracker</h2>
-          <EmbedCode :code="trackerSnippet(origin, site.id)" />
-          <small class="text-muted text-s"
-            >Importing it counts a page view; call
-            <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the
-            rest. Until it has loaded, or if it never does, track() does nothing.</small
-          >
-        </aside>
-      </div>
+    <!-- What the site may send takes the room; the tracker that sends it sits beside it. -->
+    <template v-if="site">
+      <AppAlert v-if="countsDeleted" tone="success" title="Counts deleted."
+        ><span class="font-mono">{{ project }}</span> counts again from zero.</AppAlert
+      >
+      <AppAlert
+        v-if="deleteError"
+        :title="removal === 'site' ? 'Could not delete the site.' : 'Could not delete the counts.'"
+        >{{ deleteError }}</AppAlert
+      >
+      <AppSection title="Events">
+        <AppAlert v-if="savedNotice" tone="success" title="Saved."
+          >The next event the site sends is checked against it.</AppAlert
+        >
+        <SiteForm :key="JSON.stringify(site)" :site="site" @saved="saved" />
+      </AppSection>
     </template>
     <p v-else-if="data" class="text-muted">
       This project doesn't count its usage.
       <NuxtLink :to="`/p/${project}`" class="link">Count usage</NuxtLink> on its page to start.
     </p>
 
-    <ConfirmDialog
-      v-model:open="deleteOpen"
-      :title="REMOVALS[removal].title"
-      :confirm-label="REMOVALS[removal].confirm"
-      tone="danger"
-      :confirm-word="project"
-      @confirm="remove"
-    >
-      <template #description>{{ REMOVALS[removal].description }}</template>
-    </ConfirmDialog>
-  </div>
+    <template v-if="site" #aside>
+      <AppSection title="Tracker">
+        <EmbedCode :code="trackerSnippet(origin, site.id)" />
+        <small class="text-muted text-s"
+          >Importing it counts a page view; call
+          <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the
+          rest. Until it has loaded, or if it never does, track() does nothing.</small
+        >
+      </AppSection>
+    </template>
+  </AppPage>
 </template>
