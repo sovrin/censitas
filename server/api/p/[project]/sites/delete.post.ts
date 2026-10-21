@@ -1,10 +1,10 @@
-import { deleteSite } from '../../../core/sites'
+import { deleteSite } from '../../../../core/sites'
 import { announceChange } from '#nexitas/server/utils/changes'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { routeSite } from '../../../utils/censitas'
+import { projectSite } from '../../../../utils/censitas'
 
 export default defineEventHandler((event) => {
-  deleteSite(nexitasDatabase(), routeSite(event).id)
+  deleteSite(nexitasDatabase(), projectSite(event).id)
   announceChange()
   return { ok: true }
 })

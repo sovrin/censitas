@@ -1,14 +1,11 @@
 // Every rule about what censitas accepts lives here, shared by the dashboard and the server. The
 // owner's sign-in and what an origin is are nexitas' rules.
 import { z } from 'zod'
-import { originsSchema } from '#nexitas/shared/contracts'
 
 const NAME = /^[a-z][a-z0-9-]{0,63}$/
 const PROP = /^[a-z][a-zA-Z0-9]{0,31}$/
 // A value is a word from a short list the site owner wrote down, never free text from a page.
 const VALUE = /^[\w.:+-]{1,64}$/
-
-export const siteIdSchema = z.string().regex(NAME, 'Use lowercase letters, digits and dashes.')
 
 /** A record whose keys must match `pattern`. A bad key is reported at its own path with
  *  `message`; zod's own key check only says the record has an invalid key. */
@@ -43,39 +40,17 @@ export const siteEventsSchema = keyed(
 /** What can change about a site: its events. Who may send is its project's origins. */
 export const siteSettingsSchema = z.object({ events: siteEventsSchema }).strict()
 
-/** Counting for a project: its site takes the project's id, which the tracker then names. */
-export const newSiteSchema = siteSettingsSchema.extend({ projectId: z.string().max(64) }).strict()
-
-/** A site as a sites file holds it: with the origins of its project, so a file stays complete. */
-export const siteConfigSchema = z
-  .object({
-    id: siteIdSchema,
-    origins: originsSchema,
-    events: siteEventsSchema,
-  })
-  .strict()
-export type SiteConfig = z.infer<typeof siteConfigSchema>
+/** A site's settings with the origins of its project: what a beacon is checked against. */
+export interface SiteConfig {
+  id: string
+  origins: string[]
+  events: z.infer<typeof siteEventsSchema>
+}
 
 /** A site as stored: its settings, the project it counts for, and that project's origins. */
 export interface Site extends SiteConfig {
   projectId: string
 }
-
-/** A file of sites, as the dashboard exports and imports them: settings only, never counts. */
-export const sitesFileSchema = z
-  .object({
-    censitas: z.literal(1, 'This is not a censitas sites file.'),
-    sites: z
-      .array(siteConfigSchema)
-      .min(1, 'The file holds no sites.')
-      .max(128)
-      .refine(
-        (sites) => new Set(sites.map((site) => site.id)).size === sites.length,
-        'Each site once.',
-      ),
-  })
-  .strict()
-export type SitesFile = z.infer<typeof sitesFileSchema>
 
 /** What track.js sends. Names, props and values are checked against the site afterwards. */
 export const beaconSchema = z
@@ -93,19 +68,6 @@ export type Refusal = (typeof REFUSALS)[number]
 
 /** The ranges the dashboard offers, in days. */
 export const RANGES = [7, 30, 90] as const
-
-export interface SiteSummary {
-  id: string
-  origins: string[]
-  /** Every event counted in the last 30 days. */
-  events: number
-  /** Of those, page views. */
-  pageviews: number
-  /** Page views in the 30 days before, to compare with. */
-  previousPageviews: number
-  /** Page views per day over the last 30 days, oldest first. */
-  trend: number[]
-}
 
 export interface EventReport {
   name: string

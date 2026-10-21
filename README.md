@@ -10,7 +10,7 @@ nexitas. nexitas brings the sign-in, the page shell, the database and the projec
 name and origins); censitas adds:
 
 - a tracker that a project's pages load by URL, and the public endpoint its beacons go to;
-- the usage pages: every site's daily counts and the share of each prop value;
+- a usage page for each project: its daily counts and the share of each prop value;
 - a Usage panel on each project's page: start counting, today's figure, the tracker snippet.
 
 It stores only counters (site, UTC day, event, prop value, count) and nothing that could tell one
@@ -21,8 +21,10 @@ visitor from another.
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
                      ── POST /v1/e                   → one event, counted if its site allows it
-owner               ── /projects/<id>                a project's usage panel and tracker (nexitas)
-(signed in)         ── /sites                        usage across sites, daily counts, breakdowns
+owner               ── /p/<id>                       a project's usage panel and tracker (nexitas)
+(signed in)         ── /p/<id>/sites                 the project's usage: daily counts, breakdowns
+                     ── /p/<id>/sites/settings        its events, the tracker, deleting
+                     ── /api/p/<id>/sites/…           → the same, for the project's site only
                      ── GET  /api/events             → live: "something changed", every 3 s at most
 ```
 
@@ -112,25 +114,6 @@ release starts sending something new, then Clear them; only refusals after that 
 applies from the next beacon on. The site's settings page shows the snippet to put in it.
 Delete counts (on the settings page) starts a site over from zero, after testing for example, and
 keeps its settings and tracker; deleting the site deletes its counts with it.
-
-**Import and export** (under Usage) move settings, never counts, as one JSON file. A file's origins
-become its project's, for every module; a site whose project does not exist yet gets one:
-
-```json
-{
-  "censitas": 1,
-  "sites": [
-    { "id": "sonotas", "origins": ["https://sonotas.example.com"], "events": { "pageview": {} } }
-  ]
-}
-```
-
-Import shows what it adds and which sites' settings it replaces before it changes anything; the
-replaced sites keep their counts. `examples/sonotas.json` is the full set for sonotas: opening a
-file by format, exports by their settings (aspect, resolution, fps, quality, fast export, layout,
-view, staves, theme, song length), how long a finished export took, failures, cancels, downloads
-and copied links. Send each value as the file lists it (`fps: '30'`, `layout: 'line'`), and bucket
-anything continuous, like the song length, before sending it.
 
 ## Abuse
 

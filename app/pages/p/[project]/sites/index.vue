@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../shared/contracts'
+import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../../shared/contracts'
 import { errorMessage } from '#nexitas/app/lib/format'
-import { formatCount, formatDay, formatDelta } from '../../../lib/format'
+import { formatCount, formatDay, formatDelta } from '../../../../lib/format'
 
+const project = useProject().id.value
 const route = useRoute()
-const id = computed(() => String(route.params.id))
 const days = computed(() =>
   RANGES.some((range) => String(range) === route.query.days) ? Number(route.query.days) : 30,
 )
-useHead({ title: () => `${id.value} · ${useRuntimeConfig().public.nexitas.name}` })
+// Read once here: the title is resolved again later, outside setup, where composables fail.
+const { name } = useRuntimeConfig().public.nexitas
+useHead({ title: () => `${project} · ${name}` })
 
 const { data, error, refresh, status } = await useFetch<SiteReport>(
-  () => `/api/sites/${id.value}/report`,
-  {
-    query: { days },
-  },
+  `/api/p/${project}/sites/report`,
+  { query: { days } },
 )
 
+/** No site: the project doesn't count, which is switched on on its page. */
+const counting = computed(() => error.value?.statusCode !== 404)
 const counted = computed(() => data.value?.events.filter((event) => event.total) ?? [])
 /** Page views lead with the large chart; every other event follows with its own. */
 const views = computed(() => counted.value.find((event) => event.name === 'pageview'))
@@ -55,7 +57,7 @@ async function clearRefused() {
   clearing.value = true
   clearError.value = ''
   try {
-    await $fetch(`/api/sites/${id.value}/refusals/clear`, { method: 'POST', body: {} })
+    await $fetch(`/api/p/${project}/sites/refusals/clear`, { method: 'POST', body: {} })
     await refresh()
   } catch (cause) {
     clearError.value = errorMessage(cause)
@@ -69,51 +71,46 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
 </script>
 
 <template>
-  <div class="stack gap-6">
-    <div class="cluster justify-between gap-4">
-      <nav aria-label="Breadcrumb">
-        <ol class="breadcrumb">
-          <li><NuxtLink to="/sites">Usage</NuxtLink></li>
-          <li aria-current="page" class="font-mono">{{ id }}</li>
-        </ol>
-      </nav>
-      <span class="cluster gap-4 text-s">
-        <!-- Colour only where the owner is needed: events the settings turn away. The details
-             wait at the end of the page. -->
-        <a v-if="data?.refused.total" href="#refused" class="link text-warning"
-          >{{ formatCount(data.refused.total) }} refused</a
-        >
-        <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>
-      </span>
-    </div>
-
-    <header class="cluster justify-between items-end gap-4">
+  <div class="stack gap-5">
+    <div class="page-header">
       <div class="stack gap-1 min-w-0">
-        <h1 class="text-l weight-600 font-mono">{{ id }}</h1>
+        <h1 class="text-xl weight-600 font-mono">{{ project }}</h1>
         <p v-if="data" class="font-mono text-xs text-muted break-words">
           {{ data.origins.join(' · ') }}
         </p>
       </div>
-      <span class="cluster gap-3 text-s" role="group" aria-label="Range">
-        <NuxtLink
-          v-for="range in RANGES"
-          :key="range"
-          :to="{ query: range === 30 ? {} : { days: String(range) } }"
-          class="link"
-          :data-quiet="days === range ? undefined : ''"
-          :aria-current="days === range ? 'page' : undefined"
-          >{{ range }} days</NuxtLink
+      <div v-if="counting" class="cluster gap-4">
+        <!-- Colour only where the owner is needed: events the settings turn away. The details
+             wait at the end of the page. -->
+        <a v-if="data?.refused.total" href="#refused" class="link text-warning text-s"
+          >{{ formatCount(data.refused.total) }} refused</a
         >
-      </span>
-    </header>
+        <span class="cluster gap-3 text-s" role="group" aria-label="Range">
+          <NuxtLink
+            v-for="range in RANGES"
+            :key="range"
+            :to="{ query: range === 30 ? {} : { days: String(range) } }"
+            class="link"
+            :data-quiet="days === range ? undefined : ''"
+            :aria-current="days === range ? 'page' : undefined"
+            >{{ range }} days</NuxtLink
+          >
+        </span>
+        <NuxtLink :to="`/p/${project}/sites/settings`" class="btn" data-size="s">Settings</NuxtLink>
+      </div>
+    </div>
 
-    <div v-if="error" class="alert" data-tone="danger" role="alert">
+    <p v-if="!counting" class="text-muted">
+      This project doesn't count its usage.
+      <NuxtLink :to="`/p/${project}`" class="link">Count usage</NuxtLink> on its page to start.
+    </p>
+    <div v-else-if="error" class="alert" data-tone="danger" role="alert">
       <div><strong>Could not load this site.</strong> {{ errorMessage(error) }}</div>
       <button type="button" class="btn" data-size="s" @click="refresh()">Try again</button>
     </div>
     <p v-else-if="data && !counted.length" class="text-muted">
       Nothing counted in the last {{ days }} days. The tracker to put in the site is under
-      <NuxtLink :to="`/sites/${id}/settings`" class="link">Settings</NuxtLink>.
+      <NuxtLink :to="`/p/${project}/sites/settings`" class="link">Settings</NuxtLink>.
     </p>
     <div
       v-if="data && counted.length"
@@ -121,7 +118,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       :data-pending="changingRange || undefined"
     >
       <!-- The figures of the range, each against the same number of days before it. -->
-      <div class="headline hairline-b pb-5">
+      <div class="headline">
         <div v-for="event in headline" :key="event.name" class="stat">
           <b>{{ formatCount(event.total) }}</b>
           <span class="cluster gap-2"
@@ -138,17 +135,17 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       </div>
 
       <section v-if="views" class="stack gap-3" aria-labelledby="event-pageview">
-        <h2 id="event-pageview" class="text-s weight-600">Page views per day</h2>
+        <h2 id="event-pageview" class="text-s weight-600 hairline-b pb-2">Page views per day</h2>
         <ColumnChart name="pageview" :days="data.days" :daily="views.daily" size="l" />
       </section>
 
       <section
         v-for="event in others"
         :key="event.name"
-        class="stack gap-4 hairline-t pt-5"
+        class="stack gap-4"
         :aria-labelledby="`event-${event.name}`"
       >
-        <div class="cluster justify-between gap-4">
+        <div class="cluster justify-between gap-4 hairline-b pb-2">
           <h2 :id="`event-${event.name}`" class="text-s weight-600 font-mono">
             {{ event.name }}
           </h2>
@@ -207,10 +204,10 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
     <section
       v-if="data?.refused.total"
       id="refused"
-      class="stack gap-3 hairline-t pt-5"
+      class="stack gap-3"
       aria-labelledby="refused-title"
     >
-      <div class="cluster justify-between gap-4">
+      <div class="cluster justify-between gap-4 hairline-b pb-2">
         <h2 id="refused-title" class="text-s weight-600">Refused</h2>
         <button
           type="button"
@@ -226,8 +223,8 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         {{ formatCount(data.refused.total) }}
         {{ data.refused.total === 1 ? 'event' : 'events' }} in the last {{ days }} days, the latest
         on {{ formatDay(data.refused.latest!) }}, sent something the
-        <NuxtLink :to="`/sites/${id}/settings`" class="link">settings</NuxtLink> don't list, and
-        weren't counted.
+        <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't list,
+        and weren't counted.
       </p>
       <ul class="text-s">
         <li v-for="refusal in refusals" :key="refusal.reason">

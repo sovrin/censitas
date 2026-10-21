@@ -1,19 +1,18 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { siteConfigSchema, sitesFileSchema, type SiteConfig } from '../../shared/contracts'
+import { siteSettingsSchema, type SiteConfig } from '../../shared/contracts'
 import {
   clearRefusals,
   countEvent,
   countRefusal,
   countToday,
   siteReport,
-  siteSummaries,
 } from '../../server/core/counts'
 import { openDatabase } from '#nexitas/server/core/database'
-import { createProject, deleteProject, getProject } from '#nexitas/server/core/projects'
+import { createProject, deleteProject } from '#nexitas/server/core/projects'
 import { isBot } from '../../server/core/limits'
 import { censitas } from '../../server/core/module'
 import {
@@ -21,10 +20,8 @@ import {
   createSite,
   deleteCounts,
   deleteSite,
+  getProjectSite,
   getSite,
-  importSites,
-  listSites,
-  SiteConflict,
   updateSite,
 } from '../../server/core/sites'
 
@@ -46,15 +43,15 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const sonotas: SiteConfig = siteConfigSchema.parse({
+const ORIGIN = 'https://sonotas.example.com'
+const sonotas: SiteConfig = {
   id: 'sonotas',
-  origins: ['https://sonotas.example.com/'],
+  origins: [ORIGIN],
   events: {
     pageview: {},
     load: { source: ['demo', 'file'], format: ['gp', 'gpx'] },
   },
-})
-const ORIGIN = 'https://sonotas.example.com'
+}
 /** sonotas as a project of nexitas, counted by censitas. */
 function addSonotas(db: DatabaseSync) {
   createProject(db, { id: 'sonotas', name: 'sonotas', origins: sonotas.origins })
@@ -66,28 +63,24 @@ const beacon = (body: object, origin: string | undefined = ORIGIN) =>
   acceptBeacon(findSite, origin, JSON.stringify(body))
 
 describe('site settings', () => {
-  it('refuse origins with a path, bad names, free-text values and repeats', () => {
-    const site = (events: object, origins = [ORIGIN]) =>
-      siteConfigSchema.safeParse({ id: 'sonotas', origins, events }).success
+  it('refuse bad names, free-text values and repeats', () => {
+    const site = (events: object) => siteSettingsSchema.safeParse({ events }).success
     expect(site({ pageview: {} })).toBe(true)
-    expect(site({ pageview: {} }, ['https://sonotas.example.com/app'])).toBe(false)
-    expect(site({ pageview: {} }, [])).toBe(false)
     expect(site({})).toBe(false)
     expect(site({ PageView: {} })).toBe(false)
     expect(site({ load: { source: ['a file name.gp'] } })).toBe(false)
     expect(site({ load: { source: [] } })).toBe(false)
     expect(site({ load: { source: ['demo', 'demo'] } })).toBe(false)
-    expect(siteConfigSchema.safeParse({ ...sonotas, id: 'Sonotas' }).success).toBe(false)
   })
 
-  it('are stored, listed, changed, and deleted with their counts', () => {
+  it('are stored, changed, and deleted with their counts', () => {
     const db = database()
     expect(addSonotas(db)).toBe(true)
     expect(createSite(db, 'sonotas', sonotas.events)).toBe(false)
     expect(getSite(db, 'sonotas')).toEqual(stored(sonotas))
     const changed = { ...sonotas, events: { pageview: {}, 'link-copy': {} } }
     expect(updateSite(db, 'sonotas', changed.events)).toBe(true)
-    expect(listSites(db)).toEqual([stored(changed)])
+    expect(getSite(db, 'sonotas')).toEqual(stored(changed))
     countEvent(db, 'sonotas', 'pageview', {}, NOW)
     countEvent(db, 'other', 'pageview', {}, NOW)
     expect(deleteSite(db, 'sonotas')).toBe(true)
@@ -99,9 +92,12 @@ describe('site settings', () => {
     const db = database()
     addSonotas(db)
     expect(censitas.projectStatus!(db, 'sonotas')).toEqual([
-      { text: 'nothing yet today', to: '/sites/sonotas' },
+      { text: 'nothing yet today', to: '/p/sonotas/sites' },
     ])
     expect(censitas.projectStatus!(db, 'other')).toEqual([])
+    // Every owner route finds the site through its project, so another project finds none.
+    expect(getProjectSite(db, 'sonotas')).toEqual(stored(sonotas))
+    expect(getProjectSite(db, 'other')).toBeNull()
     countEvent(db, 'sonotas', 'pageview', {})
     deleteProject(db, 'sonotas', [censitas])
     expect(getSite(db, 'sonotas')).toBeNull()
@@ -121,54 +117,6 @@ describe('deleting counts', () => {
     expect(siteReport(db, sonotas, 7, NOW).events.every((event) => !event.total)).toBe(true)
     expect(siteReport(db, sonotas, 7, NOW).refused.total).toBe(0)
     expect(db.prepare('SELECT site FROM counts').all()).toEqual([{ site: 'other' }])
-  })
-})
-
-describe('sites files', () => {
-  it('import new sites and replace existing settings, keeping counts', () => {
-    const db = database()
-    addSonotas(db)
-    countEvent(db, 'sonotas', 'pageview', {}, NOW)
-    const changed = {
-      ...sonotas,
-      origins: ['https://www.sonotas.example.com'],
-      events: { pageview: {}, 'link-copy': {} },
-    }
-    const other = { ...sonotas, id: 'other' }
-    expect(importSites(db, [changed, other])).toEqual({ added: ['other'], replaced: ['sonotas'] })
-    expect(listSites(db)).toEqual([stored(other), stored(changed)])
-    // The file's origins are the project's now, for every module; its name stays.
-    expect(getProject(db, 'sonotas')).toEqual({
-      id: 'sonotas',
-      name: 'sonotas',
-      origins: changed.origins,
-    })
-    expect(countToday(db, NOW)).toBe(1)
-  })
-
-  it('import nothing when a project counts under another site already', () => {
-    const db = database()
-    addSonotas(db)
-    db.prepare("UPDATE sites SET id = 'sonotas-web'").run()
-    expect(() => importSites(db, [{ ...sonotas, id: 'other' }, sonotas])).toThrow(SiteConflict)
-    expect(listSites(db).map((site) => site.id)).toEqual(['sonotas-web'])
-    expect(getProject(db, 'other')).toBeNull()
-  })
-
-  it('are refused without the marker, empty or with a site twice', () => {
-    const file = (sites: unknown, censitas: unknown = 1) =>
-      sitesFileSchema.safeParse({ censitas, sites }).success
-    expect(file([sonotas])).toBe(true)
-    expect(file([sonotas], 2)).toBe(false)
-    expect(file([])).toBe(false)
-    expect(file([sonotas, sonotas])).toBe(false)
-  })
-
-  it('include a valid example for sonotas', () => {
-    const example = JSON.parse(
-      readFileSync(join(import.meta.dirname, '../../examples/sonotas.json'), 'utf8'),
-    )
-    expect(sitesFileSchema.safeParse(example).success).toBe(true)
   })
 })
 
@@ -296,18 +244,8 @@ describe('counters', () => {
       },
       { site: 'sonotas', day: '2026-10-19', event: 'pageview', prop: '', value: '', count: 1 },
     ])
-    expect(countToday(db, NOW)).toBe(3)
-    countEvent(db, 'sonotas', 'pageview', {}, NOW - 40 * DAY)
-    const [summary] = siteSummaries(db, [sonotas], NOW)
-    expect(summary).toMatchObject({
-      id: 'sonotas',
-      origins: [ORIGIN],
-      events: 4,
-      pageviews: 1,
-      previousPageviews: 1,
-    })
-    expect(summary!.trend).toHaveLength(30)
-    expect(summary!.trend.at(-1)).toBe(1)
+    expect(countToday(db, 'sonotas', NOW)).toBe(3)
+    expect(countToday(db, 'other', NOW)).toBe(0)
   })
 
   it('report a range per day and by prop value, configured values at 0', () => {

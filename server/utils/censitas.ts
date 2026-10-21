@@ -1,12 +1,13 @@
 import type { H3Event } from 'h3'
 import { pacedAnnouncer } from '#nexitas/server/utils/changes'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { getSite } from '../core/sites'
+import { requestProject } from '#nexitas/server/utils/projects'
+import { getProjectSite } from '../core/sites'
 
-/** The site named in the route, or a 404. */
-export function routeSite(event: H3Event) {
-  const site = getSite(nexitasDatabase(), getRouterParam(event, 'id') ?? '')
-  if (!site) throw createError({ statusCode: 404, statusMessage: 'This site is not configured.' })
+/** The site of the request's project, or a 404 when the project doesn't count. */
+export function projectSite(event: H3Event) {
+  const site = getProjectSite(nexitasDatabase(), requestProject(event).id)
+  if (!site) throw createError({ statusCode: 404, statusMessage: 'This project does not count.' })
   return site
 }
 

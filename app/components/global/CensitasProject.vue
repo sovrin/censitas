@@ -7,9 +7,7 @@ import { trackerSnippet } from '../../lib/embed'
 
 /** censitas' part of a project's page: whether it counts, today's figure, and its tracker. */
 const props = defineProps<{ project: ProjectSummary }>()
-const { data, error, refresh } = await useFetch<ProjectUsage>('/api/sites', {
-  query: { project: props.project.id },
-})
+const { data, error, refresh } = await useFetch<ProjectUsage>(`/api/p/${props.project.id}/sites`)
 useLive(refresh)
 const origin = useRequestURL().origin
 
@@ -20,9 +18,9 @@ async function start() {
   startError.value = ''
   try {
     // The tracker counts a page view on import, so a site starts with that event alone.
-    await $fetch('/api/sites', {
+    await $fetch(`/api/p/${props.project.id}/sites`, {
       method: 'POST',
-      body: { projectId: props.project.id, events: { pageview: {} } },
+      body: { events: { pageview: {} } },
     })
     await refresh()
   } catch (cause) {
@@ -44,8 +42,8 @@ async function start() {
         <span class="tabular">{{
           data.today ? `${formatCount(data.today)} events today` : 'nothing yet today'
         }}</span>
-        <NuxtLink :to="`/sites/${data.site.id}`" class="link">Dashboard</NuxtLink>
-        <NuxtLink :to="`/sites/${data.site.id}/settings`" class="link">Events</NuxtLink>
+        <NuxtLink :to="`/p/${project.id}/sites`" class="link">Dashboard</NuxtLink>
+        <NuxtLink :to="`/p/${project.id}/sites/settings`" class="link">Events</NuxtLink>
       </p>
       <EmbedCode :code="trackerSnippet(origin, data.site.id)" caption="JavaScript" />
       <small class="text-muted text-s"

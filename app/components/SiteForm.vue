@@ -69,7 +69,7 @@ async function save() {
   }
   pending.value = true
   try {
-    const saved = await $fetch<Site>(`/api/sites/${props.site.id}`, {
+    const saved = await $fetch<Site>(`/api/p/${props.site.projectId}/sites/settings`, {
       method: 'POST',
       body: { events: result },
     })
@@ -90,19 +90,17 @@ async function save() {
       <p class="text-s text-muted">
         Sent from <span class="font-mono break-words">{{ site.origins.join(' · ') }}</span
         >: the origins of
-        <NuxtLink :to="`/projects/${site.projectId}`" class="link">its project</NuxtLink>, which
-        every module shares.
+        <NuxtLink :to="`/p/${site.projectId}`" class="link">its project</NuxtLink>, which every
+        module shares.
       </p>
 
       <div class="stack gap-4">
-        <div class="stack gap-1">
-          <span class="text-s weight-600">Events</span>
-          <small class="text-muted text-s"
-            >Each event the site sends, and for each prop every value it may take, separated by
-            spaces. Anything not listed is refused, so a forged event can only raise a count that
-            exists.</small
-          >
-        </div>
+        <!-- Named by the page's heading above the form. -->
+        <small class="text-muted text-s"
+          >Each event the site sends, and for each prop every value it may take, separated by
+          spaces. Anything not listed is refused, so a forged event can only raise a count that
+          exists.</small
+        >
         <!-- Rows ease in where they are added and out where removed; the rest make room. -->
         <TransitionGroup name="row" tag="div" class="stack gap-4 relative">
           <div

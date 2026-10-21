@@ -1,5 +1,5 @@
-// censitas as a nexitas module: its schema, the beacon route sites call, and its part of the status
-// line. The owner's sign-in, the /api guard and the database itself are the core's.
+// censitas as a nexitas module: its schema, the beacon route sites call, and what it says about a
+// project. The owner's sign-in, the /api guard and the database itself are the core's.
 import type { NexitasModule } from '#nexitas/shared/modules'
 import { countToday } from './counts'
 import { getProjectSite, removeSite } from './sites'
@@ -34,24 +34,17 @@ export const censitas: NexitasModule = {
   // a site in its network panel, never the sign-in page.
   publicRoutes: [{ path: '/v1/e', maxBody: 4 * 1024, json: true }],
   // Everything censitas serves; switched off, all of it answers 404 and no beacon is counted.
-  paths: ['/sites', '/api/sites', '/api/export', '/api/import'],
+  paths: ['/sites', '/api/sites'],
   // The counters' heartbeat: is anything arriving today?
-  status: (db) => {
-    const today = countToday(db)
-    return [
-      today
-        ? { text: `${formatCount(today)} events today`, to: '/sites', tone: 'success' }
-        : { text: 'nothing yet today', to: '/sites' },
-    ]
-  },
   projectStatus: (db, projectId) => {
     const site = getProjectSite(db, projectId)
     if (!site) return []
-    const today = countToday(db, Date.now(), site.id)
+    const today = countToday(db, site.id)
+    const to = `/p/${projectId}/sites`
     return [
       today
-        ? { text: `${formatCount(today)} events today`, to: `/sites/${site.id}`, tone: 'success' }
-        : { text: 'nothing yet today', to: `/sites/${site.id}` },
+        ? { text: `${formatCount(today)} events today`, to, tone: 'success' }
+        : { text: 'nothing yet today', to },
     ]
   },
   deleteProject: (db, projectId) => {

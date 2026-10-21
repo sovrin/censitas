@@ -131,7 +131,7 @@
   }
 }
 
-/* An alert that appears (saved, imported, could not load) fades in where it stands. */
+/* An alert that appears (saved, deleted, could not load) fades in where it stands. */
 .alert {
   transition: opacity var(--ae-duration) var(--ae-ease);
 
@@ -141,7 +141,7 @@
 }
 
 /* The headline figures, two by two: aequitas' .stats divides one row with hairlines, which land
-   mid-grid once its four figures wrap in this narrow column. */
+   mid-grid once its four figures wrap on a phone. */
 .headline {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -166,21 +166,5 @@
     @starting-style {
       transform: scaleX(0);
     }
-  }
-}
-
-/* A site's page views over 30 days, small enough for its row. */
-.spark {
-  display: flex;
-  flex: none;
-  align-items: flex-end;
-  gap: 1px;
-  inline-size: var(--ae-space-8);
-  block-size: var(--ae-space-5);
-  border-block-end: 1px solid var(--ae-border);
-
-  > span {
-    flex: 1;
-    background: var(--ae-text-muted);
   }
 }

@@ -3,7 +3,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { beaconSchema, type Refusal, type Site, type SiteConfig } from '../../shared/contracts'
 import { transaction } from '#nexitas/server/core/database'
-import { createProject, getProject, updateProject } from '#nexitas/server/core/projects'
 
 interface SiteRow {
   id: string
@@ -21,10 +20,6 @@ const toSite = (row: SiteRow): Site => ({
 
 const SELECT = `SELECT sites.id, sites.project_id, sites.events, coalesce(projects.origins, '[]') AS origins
   FROM sites LEFT JOIN projects ON projects.id = sites.project_id`
-
-export function listSites(db: DatabaseSync): Site[] {
-  return (db.prepare(`${SELECT} ORDER BY sites.id`).all() as unknown as SiteRow[]).map(toSite)
-}
 
 export function getSite(db: DatabaseSync, id: string): Site | null {
   const row = db.prepare(`${SELECT} WHERE sites.id = ?`).get(id) as SiteRow | undefined
@@ -90,32 +85,6 @@ export function removeSite(db: DatabaseSync, id: string) {
   db.prepare('DELETE FROM counts WHERE site = ?').run(id)
   db.prepare('DELETE FROM refusals WHERE site = ?').run(id)
   return db.prepare('DELETE FROM sites WHERE id = ?').run(id).changes === 1
-}
-
-/** An import that would give a project a second site. */
-export class SiteConflict extends Error {}
-
-/** Adds the sites that are new and replaces the settings of those that exist, all or none.
- *  Counts stay as they are. A file's origins become its project's, which changes them for every
- *  module of that project; a project that does not exist yet is made under the site's id. */
-export function importSites(db: DatabaseSync, sites: SiteConfig[], now = Date.now()) {
-  return transaction(db, () => {
-    const added: string[] = []
-    const replaced: string[] = []
-    for (const entry of sites) {
-      const site = getSite(db, entry.id)
-      const projectId = site?.projectId ?? entry.id
-      const project = getProject(db, projectId)
-      if (project) updateProject(db, projectId, { name: project.name, origins: entry.origins }, now)
-      else createProject(db, { id: projectId, name: projectId, origins: entry.origins }, now)
-      if (site) {
-        updateSite(db, site.id, entry.events, now)
-        replaced.push(site.id)
-      } else if (createSite(db, projectId, entry.events, now)) added.push(entry.id)
-      else throw new SiteConflict(`The project ${projectId} counts under another site already.`)
-    }
-    return { added, replaced }
-  })
 }
 
 /** What gets counted once a beacon has passed every rule. */

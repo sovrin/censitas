@@ -6,7 +6,6 @@ import {
   type Refusal,
   type SiteConfig,
   type SiteReport,
-  type SiteSummary,
 } from '../../shared/contracts'
 import { transaction } from '#nexitas/server/core/database'
 
@@ -68,51 +67,14 @@ function refusalsSince(db: DatabaseSync, site: string, day: string) {
   return { total: rows.reduce((sum, row) => sum + row.count, 0), reasons, latest }
 }
 
-/** Every site with what it counted in the last 30 days, the 30 before, and page views per day. */
-export function siteSummaries(
-  db: DatabaseSync,
-  sites: SiteConfig[],
-  now = Date.now(),
-): SiteSummary[] {
-  const totals = db.prepare(
-    `SELECT coalesce(sum(count) FILTER (WHERE day >= $since), 0) AS events,
-      coalesce(sum(count) FILTER (WHERE day >= $since AND event = 'pageview'), 0) AS pageviews,
-      coalesce(sum(count) FILTER (WHERE day < $since AND event = 'pageview'), 0) AS previousPageviews
-    FROM counts WHERE site = $site AND prop = '' AND day >= $before`,
-  )
-  const daily = db.prepare(
-    `SELECT day, count FROM counts
-    WHERE site = ? AND event = 'pageview' AND prop = '' AND day >= ?`,
-  )
-  const days = Array.from({ length: 30 }, (_, i) => dayOf(now - (29 - i) * DAY))
-  return sites.map((site) => {
-    const counts = new Map(
-      (daily.all(site.id, days[0]!) as { day: string; count: number }[]).map((row) => [
-        row.day,
-        row.count,
-      ]),
-    )
-    return {
-      id: site.id,
-      origins: site.origins,
-      ...(totals.get({ site: site.id, since: since(30, now), before: since(60, now) }) as {
-        events: number
-        pageviews: number
-        previousPageviews: number
-      }),
-      trend: days.map((day) => counts.get(day) ?? 0),
-    }
-  })
-}
-
-/** Every event counted today, across sites or for one. */
-export function countToday(db: DatabaseSync, now = Date.now(), site?: string) {
+/** Every event a site counted today. */
+export function countToday(db: DatabaseSync, site: string, now = Date.now()) {
   return (
     db
       .prepare(
-        "SELECT coalesce(sum(count), 0) AS count FROM counts WHERE prop = '' AND day = ? AND (? IS NULL OR site = ?)",
+        "SELECT coalesce(sum(count), 0) AS count FROM counts WHERE prop = '' AND day = ? AND site = ?",
       )
-      .get(dayOf(now), site ?? null, site ?? null) as { count: number }
+      .get(dayOf(now), site) as { count: number }
   ).count
 }
 
