@@ -6,7 +6,7 @@ import { trackerSnippet } from '../../../../lib/embed'
 const project = useProject().id.value
 const { data, error, refresh } = await useFetch<ProjectUsage>(`/api/p/${project}/sites`)
 const site = computed(() => data.value?.site)
-useHead({ title: `${project} settings · ${useRuntimeConfig().public.nexitas.name}` })
+useHead({ title: `Settings · ${project}` })
 
 const savedNotice = ref(false)
 async function saved() {
@@ -20,7 +20,6 @@ const origin = useRequestURL().origin
 type Removal = 'counts' | 'site'
 const removal = ref<Removal>('counts')
 const deleteOpen = ref(false)
-const typed = ref('')
 const deleteError = ref('')
 const countsDeleted = ref(false)
 const REMOVALS = {
@@ -39,7 +38,6 @@ const REMOVALS = {
 } as const
 function ask(next: Removal) {
   removal.value = next
-  typed.value = ''
   deleteError.value = ''
   countsDeleted.value = false
   deleteOpen.value = true
@@ -74,7 +72,7 @@ async function remove() {
     </div>
     <template v-else-if="site">
       <div class="page-header">
-        <h1 class="text-xl weight-600 font-mono">{{ project }}</h1>
+        <h1 class="text-xl weight-600">Settings</h1>
         <div class="cluster gap-2">
           <button
             type="button"
@@ -125,7 +123,7 @@ async function remove() {
 
         <aside class="stack gap-3" aria-labelledby="embed-title">
           <h2 id="embed-title" class="text-s weight-600 hairline-b pb-2">Tracker</h2>
-          <EmbedCode :code="trackerSnippet(origin, site.id)" caption="JavaScript" />
+          <EmbedCode :code="trackerSnippet(origin, site.id)" />
           <small class="text-muted text-s"
             >Importing it counts a page view; call
             <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the
@@ -144,16 +142,10 @@ async function remove() {
       :title="REMOVALS[removal].title"
       :confirm-label="REMOVALS[removal].confirm"
       tone="danger"
-      :disabled="typed !== project"
+      :confirm-word="project"
       @confirm="remove"
     >
       <template #description>{{ REMOVALS[removal].description }}</template>
-      <div class="field">
-        <label for="confirm-id"
-          >Type <span class="font-mono">{{ project }}</span> to confirm</label
-        >
-        <input id="confirm-id" v-model="typed" class="input font-mono text-s" autocomplete="off" />
-      </div>
     </ConfirmDialog>
   </div>
 </template>

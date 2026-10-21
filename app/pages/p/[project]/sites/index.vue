@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../../shared/contracts'
-import { errorMessage } from '#nexitas/app/lib/format'
-import { formatCount, formatDay, formatDelta } from '../../../../lib/format'
+import { errorMessage, formatCount, formatDay, formatDelta, plural } from '#nexitas/app/lib/format'
 
 const project = useProject().id.value
 const route = useRoute()
 const days = computed(() =>
   RANGES.some((range) => String(range) === route.query.days) ? Number(route.query.days) : 30,
 )
-// Read once here: the title is resolved again later, outside setup, where composables fail.
-const { name } = useRuntimeConfig().public.nexitas
-useHead({ title: () => `${project} · ${name}` })
+useHead({ title: `Usage · ${project}` })
 
 const { data, error, refresh, status } = await useFetch<SiteReport>(
   `/api/p/${project}/sites/report`,
@@ -74,8 +71,8 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
   <div class="stack gap-5">
     <div class="page-header">
       <div class="stack gap-1 min-w-0">
-        <h1 class="text-xl weight-600 font-mono">{{ project }}</h1>
-        <p v-if="data" class="font-mono text-xs text-muted break-words">
+        <h1 class="text-xl weight-600">Usage</h1>
+        <p v-if="data" class="text-s text-muted font-mono break-words">
           {{ data.origins.join(' · ') }}
         </p>
       </div>
@@ -161,41 +158,37 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         </div>
         <ColumnChart :name="event.name" :days="data.days" :daily="event.daily" />
         <!-- Each prop's values by how often they came along, as a share of the event. -->
-        <table
-          v-for="prop in event.props"
-          :key="prop.key"
-          class="table"
-          data-size="s"
-          data-hover="false"
-        >
-          <thead>
-            <tr>
-              <th scope="col">
-                <span class="font-mono">{{ prop.key }}</span>
-              </th>
-              <th scope="col" data-num>Count</th>
-              <th scope="col" data-num>Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="value in prop.values" :key="value.value">
-              <th scope="row" class="font-mono weight-400">
-                <span class="stack gap-1">
-                  {{ value.value }}
-                  <span class="share" aria-hidden="true"
-                    ><span :style="{ '--value': share(value.count, event.total) }"></span
-                  ></span>
-                </span>
-              </th>
-              <td data-num :class="value.count ? undefined : 'text-muted'">
-                {{ formatCount(value.count) }}
-              </td>
-              <td data-num class="text-muted">
-                {{ event.total ? percent(share(value.count, event.total)) : '—' }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-for="prop in event.props" :key="prop.key" class="table-scroll">
+          <table class="table" data-size="s" data-hover="false">
+            <thead>
+              <tr>
+                <th scope="col">
+                  <span class="font-mono">{{ prop.key }}</span>
+                </th>
+                <th scope="col" data-num>Count</th>
+                <th scope="col" data-num>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="value in prop.values" :key="value.value">
+                <th scope="row" class="font-mono weight-400">
+                  <span class="stack gap-1">
+                    {{ value.value }}
+                    <span class="share" aria-hidden="true"
+                      ><span :style="{ '--value': share(value.count, event.total) }"></span
+                    ></span>
+                  </span>
+                </th>
+                <td data-num :class="value.count ? undefined : 'text-muted'">
+                  {{ formatCount(value.count) }}
+                </td>
+                <td data-num class="text-muted">
+                  {{ event.total ? percent(share(value.count, event.total)) : '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
 
@@ -220,9 +213,8 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         </button>
       </div>
       <p class="text-s text-muted">
-        {{ formatCount(data.refused.total) }}
-        {{ data.refused.total === 1 ? 'event' : 'events' }} in the last {{ days }} days, the latest
-        on {{ formatDay(data.refused.latest!) }}, sent something the
+        {{ plural(data.refused.total, 'event') }} in the last {{ days }} days, the latest on
+        {{ formatDay(data.refused.latest!) }}, sent something the
         <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't list,
         and weren't counted.
       </p>

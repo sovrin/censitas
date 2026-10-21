@@ -76,8 +76,9 @@ the page never waits on it, and let `track()` do nothing until it has loaded:
 
 ```js
 // Counting is optional: until track.js has loaded, or if it never does, track() does nothing.
+const TRACKER = 'https://nexitas.example.com/v1/track.js?site=sonotas'
 let track = () => {}
-import('https://nexitas.example.com/v1/track.js?site=sonotas').then(
+import(/* @vite-ignore */ TRACKER).then(
   (module) => (track = module.track),
   () => {},
 )
@@ -92,7 +93,7 @@ Prop values are strings. A beacon its site doesn't allow is refused with a 400 o
 only your network panel shows; check there when a counter stays at 0. Bucket anything continuous
 before you send it: `duration: '1-3min'`, never `duration: '127'`.
 
-In a Nuxt or Vite app, the URL is external, so mark the import `/* @vite-ignore */`.
+The URL is external, so the import is marked `/* @vite-ignore */` for a Nuxt or Vite app.
 
 ## Sites
 
@@ -118,8 +119,7 @@ keeps its settings and tracker; deleting the site deletes its counts with it.
 ## Abuse
 
 Beacons need a configured site, a matching `Origin` and listed names and values, and must state
-their
-length and stay under 4 kB. Requests without a user agent or with a known bot's are answered 204
+their length and stay under 4 kB. Requests without a user agent or with a known bot's are answered 204
 and not counted. Each sender (an IPv4 address or an IPv6 /64) may send 60 events a minute; the
 table of senders lives in memory and is dropped every minute. None of this can stop someone
 sending allowed beacons by hand, and nothing can; it keeps them to raising existing counters, at a

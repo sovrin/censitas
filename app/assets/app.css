@@ -131,15 +131,6 @@
   }
 }
 
-/* An alert that appears (saved, deleted, could not load) fades in where it stands. */
-.alert {
-  transition: opacity var(--ae-duration) var(--ae-ease);
-
-  @starting-style {
-    opacity: 0;
-  }
-}
-
 /* The headline figures, two by two: aequitas' .stats divides one row with hairlines, which land
    mid-grid once its four figures wrap on a phone. */
 .headline {

@@ -5,9 +5,6 @@ dist/
 .data/
 .env
 .env.*
-!.env.example
-test-results/
-coverage/
 .DS_Store
 .idea/
 

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { ProjectSummary } from '#nexitas/shared/contracts'
 import type { ProjectUsage } from '../../../shared/contracts'
-import { errorMessage } from '#nexitas/app/lib/format'
-import { formatCount } from '../../lib/format'
+import { errorMessage, plural } from '#nexitas/app/lib/format'
 import { trackerSnippet } from '../../lib/embed'
 
 /** censitas' part of a project's page: whether it counts, today's figure, and its tracker. */
@@ -40,12 +39,12 @@ async function start() {
     <template v-else-if="data?.site">
       <p class="cluster gap-4">
         <span class="tabular">{{
-          data.today ? `${formatCount(data.today)} events today` : 'nothing yet today'
+          data.today ? `${plural(data.today, 'event')} today` : 'nothing yet today'
         }}</span>
         <NuxtLink :to="`/p/${project.id}/sites`" class="link">Dashboard</NuxtLink>
         <NuxtLink :to="`/p/${project.id}/sites/settings`" class="link">Events</NuxtLink>
       </p>
-      <EmbedCode :code="trackerSnippet(origin, data.site.id)" caption="JavaScript" />
+      <EmbedCode :code="trackerSnippet(origin, data.site.id)" />
       <small class="text-muted text-s"
         >Importing it counts a page view; call
         <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the rest,

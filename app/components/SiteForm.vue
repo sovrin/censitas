@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import type { FieldIssue } from '#nexitas/shared/contracts'
 import type { Site } from '../../shared/contracts'
-import { errorMessage } from '#nexitas/app/lib/format'
 
 /** Changes a site: every event, prop and value that is counted. Nothing else is: a beacon with
  *  anything not listed here is refused. Who may send is its project's origins, set there. */
@@ -32,17 +32,13 @@ const events = ref<EventDraft[]>(
   ),
 )
 
-const pending = ref(false)
-const error = ref('')
-const issues = ref<{ path: string; message: string }[]>([])
-const fieldError = (path: string) =>
-  issues.value.find((issue) => issue.path === path || issue.path.startsWith(`${path}.`))?.message
+const { pending, error, issues, fieldError, submit } = useSubmit()
 
 /** The drafts as the site's events. A name or prop given twice would silently merge, so it is
  *  reported here instead. */
 function toEvents() {
   const result: Site['events'] = {}
-  const repeated: { path: string; message: string }[] = []
+  const repeated: FieldIssue[] = []
   for (const event of events.value) {
     const name = event.name.trim()
     if (Object.hasOwn(result, name))
@@ -60,27 +56,19 @@ function toEvents() {
 }
 
 async function save() {
-  error.value = ''
-  issues.value = []
   const { result, repeated } = toEvents()
   if (repeated.length) {
+    error.value = ''
     issues.value = repeated
     return
   }
-  pending.value = true
-  try {
-    const saved = await $fetch<Site>(`/api/p/${props.site.projectId}/sites/settings`, {
+  const saved = await submit(() =>
+    $fetch<Site>(`/api/p/${props.site.projectId}/sites/settings`, {
       method: 'POST',
       body: { events: result },
-    })
-    emit('saved', saved)
-  } catch (cause) {
-    const data = (cause as { data?: { data?: { issues?: typeof issues.value } } }).data?.data
-    if (data?.issues?.length) issues.value = data.issues
-    else error.value = errorMessage(cause)
-  } finally {
-    pending.value = false
-  }
+    }),
+  )
+  if (saved) emit('saved', saved)
 }
 </script>
 
@@ -96,7 +84,7 @@ async function save() {
 
       <div class="stack gap-4">
         <!-- Named by the page's heading above the form. -->
-        <small class="text-muted text-s"
+        <small
           >Each event the site sends, and for each prop every value it may take, separated by
           spaces. Anything not listed is refused, so a forged event can only raise a count that
           exists.</small
@@ -142,13 +130,12 @@ async function save() {
               >
                 <input
                   v-model="prop.key"
-                  class="input font-mono text-s"
+                  class="input font-mono text-s flex-1 min-w-0"
                   data-size="s"
                   :aria-label="`${event.name || `Event ${index + 1}`}: prop ${propIndex + 1}`"
                   placeholder="resolution"
                   required
                   spellcheck="false"
-                  style="inline-size: 8rem"
                   :aria-invalid="
                     !!fieldError(`events.${event.name.trim()}.${prop.key.trim()}`) || undefined
                   "
@@ -177,20 +164,12 @@ async function save() {
               </div>
             </TransitionGroup>
             <p class="ps-5">
-              <button
-                type="button"
-                class="link text-s"
-                data-quiet
-                @click="event.props.push(newProp())"
-              >
+              <button type="button" class="link text-s" @click="event.props.push(newProp())">
                 Add a prop
               </button>
             </p>
           </div>
         </TransitionGroup>
-        <span v-if="fieldError('events') && !events.length" class="text-s text-danger">{{
-          fieldError('events')
-        }}</span>
         <p>
           <button type="button" class="link text-s" @click="events.push(newEvent())">
             Add an event
@@ -199,20 +178,7 @@ async function save() {
       </div>
     </fieldset>
 
-    <div v-if="issues.length || error" class="alert" data-tone="danger" role="alert">
-      <div>
-        <template v-if="error"><strong>Could not save the site.</strong> {{ error }}</template>
-        <template v-else>
-          <strong>Check these settings.</strong>
-          <ul>
-            <li v-for="issue in issues" :key="issue.path">
-              <span class="font-mono">{{ issue.path }}</span
-              >: {{ issue.message }}
-            </li>
-          </ul>
-        </template>
-      </div>
-    </div>
+    <FormIssues :error="error" :issues="issues" failed="Could not save the settings." />
 
     <div class="cluster gap-3 hairline-t pt-5">
       <p class="caption">Changes count from the next event on.</p>
