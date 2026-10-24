@@ -71,7 +71,8 @@ const readout = computed(() => {
   const { day, count: value } = points.value[active.value]!
   return {
     value: formatCount(value),
-    day: `${formatDay(day, true)}${active.value === count.value - 1 ? ', so far' : ''}`,
+    // Today's column is short because the day isn't over, not because nothing came.
+    day: active.value === count.value - 1 ? 'today, so far' : formatDay(day, true),
     style: place(active.value),
   }
 })
@@ -120,7 +121,7 @@ const label = computed(
       </div>
       <div class="chart-dates font-mono text-xs text-muted" aria-hidden="true">
         <span v-for="tick in dateTicks" :key="tick.day" :style="place(tick.index)">{{
-          formatDay(tick.day)
+          tick.index === count - 1 ? 'today' : formatDay(tick.day)
         }}</span>
       </div>
     </div>
@@ -138,7 +139,9 @@ const label = computed(
         <tbody>
           <tr v-for="day in days" :key="day">
             <th scope="row" class="font-mono weight-400 text-muted nowrap">
-              <time :datetime="day">{{ formatDay(day, true) }}</time>
+              <time :datetime="day">{{
+                day === days[0] ? 'today, so far' : formatDay(day, true)
+              }}</time>
             </th>
             <td data-num :class="daily[day] ? undefined : 'text-muted'">
               {{ formatCount(daily[day] ?? 0) }}

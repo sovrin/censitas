@@ -41,27 +41,6 @@ async function remove(next: Removal) {
 
 <template>
   <AppPage title="Settings" failed="Could not load this site." :error="error">
-    <template v-if="site" #actions>
-      <DangerAction
-        label="Delete counts"
-        :title="`Delete everything ${project} counted?`"
-        :confirm-word="project"
-        @confirm="remove('counts')"
-      >
-        To start over, after testing for example: its counts and refusals go; its settings and the
-        tracker in it stay, and it counts again from zero. This cannot be undone.
-      </DangerAction>
-      <DangerAction
-        label="Delete site"
-        :title="`Delete ${project} and its counts?`"
-        :confirm-word="project"
-        @confirm="remove('site')"
-      >
-        It goes with all its counts, and the tracker in it is refused from then on. The project
-        stays; it just stops counting. This cannot be undone.
-      </DangerAction>
-    </template>
-
     <!-- What the site may send takes the room; the tracker that sends it sits beside it. -->
     <template v-if="site">
       <AppAlert v-if="countsDeleted" tone="success" title="Counts deleted."
@@ -93,6 +72,27 @@ async function remove(next: Removal) {
           rest. Until it has loaded, or if it never does, track() does nothing.</small
         >
       </AppSection>
+    </template>
+    <template v-if="site" #danger>
+      <span>Its counts alone, or the whole site with them; the project stays.</span>
+      <DangerAction
+        label="Delete counts"
+        :title="`Delete everything ${project} counted?`"
+        :confirm-word="project"
+        @confirm="remove('counts')"
+      >
+        To start over, after testing for example: its counts and refusals go; its settings and the
+        tracker in it stay, and it counts again from zero. This cannot be undone.
+      </DangerAction>
+      <DangerAction
+        label="Delete site"
+        :title="`Delete ${project} and its counts?`"
+        :confirm-word="project"
+        @confirm="remove('site')"
+      >
+        It goes with all its counts, and the tracker in it is refused from then on. The project
+        stays; it just stops counting. This cannot be undone.
+      </DangerAction>
     </template>
   </AppPage>
 </template>

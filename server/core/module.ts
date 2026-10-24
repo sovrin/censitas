@@ -1,7 +1,7 @@
 // censitas as a nexitas module: its schema, the beacon route sites call, and what it says about a
 // project. The owner's sign-in, the /api guard and the database itself are the core's.
 import type { NexitasModule } from '#nexitas/shared/modules'
-import { plural } from '#nexitas/app/lib/format'
+import { formatCount, plural } from '#nexitas/app/lib/format'
 import { countToday } from './counts'
 import { getProjectSite, removeSite } from './sites'
 
@@ -42,8 +42,13 @@ export const censitas: NexitasModule = {
     const to = `/p/${projectId}/sites`
     return [
       today
-        ? { text: `${plural(today, 'event')} today`, to, tone: 'success' }
-        : { text: 'nothing yet today', to },
+        ? {
+            text: `${plural(today, 'event')} today`,
+            to,
+            tone: 'success',
+            figure: formatCount(today),
+          }
+        : { text: 'nothing yet today', to, figure: '0' },
     ]
   },
   deleteProject: (db, projectId) => {

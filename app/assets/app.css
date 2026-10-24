@@ -68,7 +68,8 @@
   inline-size: 100%;
   max-inline-size: var(--ae-space-5);
   block-size: 100%;
-  background: var(--ae-text-muted);
+  /* The module's hue: a data series is where colour does its job. */
+  background: var(--ae-accent);
   transform: scaleY(var(--value));
   transform-origin: bottom;
   transition:
@@ -131,12 +132,26 @@
   }
 }
 
-/* The headline figures, two by two: aequitas' .stats divides one row with hairlines, which land
-   mid-grid once its four figures wrap on a phone. */
+/* The headline figures, one even row: aequitas' .stats divides one row with hairlines, which land
+   mid-grid once its figures wrap on a phone. */
 .headline {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: var(--ae-space-5) var(--ae-space-4);
+}
+
+/* Two by two on a phone; with an odd count the first, page views, takes a row of its own so
+   none is left alone at the end. */
+@media (width < 48rem) {
+  .headline {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    > :first-child:nth-last-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
 }
 
 /* A share of an event's total, drawn under its count: a thin ink bar on a hairline track. */
@@ -149,7 +164,7 @@
   > span {
     display: block;
     block-size: 100%;
-    background: var(--ae-text-muted);
+    background: var(--ae-accent);
     transform: scaleX(var(--value));
     transform-origin: left;
     transition: transform var(--ae-duration) var(--ae-ease);

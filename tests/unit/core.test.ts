@@ -92,7 +92,7 @@ describe('site settings', () => {
     const db = database()
     addSonotas(db)
     expect(censitas.projectStatus!(db, 'sonotas')).toEqual([
-      { text: 'nothing yet today', to: '/p/sonotas/sites' },
+      { text: 'nothing yet today', to: '/p/sonotas/sites', figure: '0' },
     ])
     expect(censitas.projectStatus!(db, 'other')).toEqual([])
     // Every owner route finds the site through its project, so another project finds none.

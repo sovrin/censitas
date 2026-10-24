@@ -23,6 +23,21 @@ const headline = computed(() => [
   ...(views.value ? [views.value] : []),
   ...others.value.toSorted((a, b) => b.total - a.total).slice(0, views.value ? 3 : 4),
 ])
+/** The lead: today's count so far, then the range against the one before. Every event counts,
+ *  page views included; nothing here is about who sent them. */
+const sum = (pick: (event: (typeof counted.value)[number]) => number) =>
+  counted.value.reduce((total, event) => total + pick(event), 0)
+const today = computed(() => sum((event) => event.daily[data.value!.days[0]!] ?? 0))
+const total = computed(() => sum((event) => event.total))
+const delta = computed(() =>
+  formatDelta(
+    total.value,
+    sum((event) => event.previous),
+  ),
+)
+const lead = computed(() =>
+  today.value ? `${plural(today.value, 'event')} so far today` : 'Nothing counted yet today',
+)
 /** What each refusal means, and where in the settings to look. */
 const REFUSAL_LABELS: Record<Refusal, string> = {
   origin: 'from an origin not listed',
@@ -73,24 +88,37 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
     <template v-if="data" #subtitle>
       <span class="font-mono break-words">{{ data.origins.join(' · ') }}</span>
     </template>
-    <template v-if="counting" #actions>
-      <!-- Colour only where the owner is needed: events the settings turn away. The details
-             wait at the end of the page. -->
-      <a v-if="data?.refused.total" href="#refused" class="link text-warning text-s"
-        >{{ formatCount(data.refused.total) }} refused</a
-      >
-      <span class="cluster gap-3 text-s" role="group" aria-label="Range">
-        <NuxtLink
-          v-for="range in RANGES"
-          :key="range"
-          :to="{ query: range === 30 ? {} : { days: String(range) } }"
-          class="link"
-          :data-quiet="days === range ? undefined : ''"
-          :aria-current="days === range ? 'page' : undefined"
-          >{{ range }} days</NuxtLink
+    <!-- Today first, then the range it sits in; the range's choice follows in the filters. -->
+    <template v-if="data && counted.length" #lead>
+      <AppLead :title="lead">
+        <template #meta
+          >{{ formatCount(total) }} in {{ days }} days<template v-if="delta">
+            · {{ delta.text }} against the {{ days }} before</template
+          ><template v-if="data.refused.total">
+            ·
+            <!-- Colour only where the owner is needed: events the settings turn away. The
+               details wait at the end of the page. -->
+            <a href="#refused" class="link" data-quiet
+              ><StateDot tone="warning">{{ formatCount(data.refused.total) }} refused</StateDot></a
+            ></template
+          ></template
         >
-      </span>
+      </AppLead>
+    </template>
+    <template v-if="counting" #actions>
       <NuxtLink :to="`/p/${project}/sites/settings`" class="btn" data-size="s">Settings</NuxtLink>
+    </template>
+    <template v-if="counting" #filters>
+      <FilterLinks
+        label="Range"
+        :options="
+          RANGES.map((range) => ({
+            label: `${range} days`,
+            to: { query: range === 30 ? {} : { days: String(range) } },
+            current: days === range,
+          }))
+        "
+      />
     </template>
 
     <p v-if="!counting" class="text-muted">
@@ -122,7 +150,6 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           >
         </div>
       </div>
-
       <AppSection v-if="views" title="Page views per day">
         <ColumnChart name="pageview" :days="data.days" :daily="views.daily" size="l" />
       </AppSection>
@@ -180,17 +207,6 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
          lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
     <!-- The id is the header's link to it; it lands on the section. -->
     <AppSection v-if="data?.refused.total" id="refused" title="Refused">
-      <template #actions>
-        <button
-          type="button"
-          class="link"
-          :disabled="clearing"
-          :aria-busy="clearing || undefined"
-          @click="clearRefused"
-        >
-          Clear
-        </button>
-      </template>
       <p class="text-s text-muted">
         {{ plural(data.refused.total, 'event') }} in the last {{ days }} days, the latest on
         {{ formatDay(data.refused.latest!) }}, sent something the
@@ -202,10 +218,20 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
         </li>
       </ul>
-      <p class="text-xs text-muted">
-        Clear forgets these for good, on every range; refusals after that show again.
-      </p>
       <AppAlert v-if="clearError" title="Could not clear them.">{{ clearError }}</AppAlert>
     </AppSection>
+
+    <template v-if="data?.refused.total" #danger>
+      <span>Forgets the refusals for good, on every range; refusals after that show again.</span>
+      <DangerAction
+        label="Clear refusals"
+        title="Clear the refusals?"
+        :pending="clearing"
+        @confirm="clearRefused"
+      >
+        Forgets these refusals for good, on every range; refusals after that show again. This cannot
+        be undone.
+      </DangerAction>
+    </template>
   </AppPage>
 </template>

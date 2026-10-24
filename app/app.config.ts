@@ -8,6 +8,7 @@ export default defineAppConfig({
         label: 'Usage',
         description: 'How your sites are used: event counts, nothing about visitors.',
         icon: 'bar-chart',
+        accent: 'teal',
         panel: 'CensitasProject',
       },
     ],
