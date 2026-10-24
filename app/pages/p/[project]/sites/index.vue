@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../../shared/contracts'
-import { errorMessage, formatCount, formatDay, formatDelta, plural } from '#nexitas/app/lib/format'
+import { formatCount, formatDay, formatDelta, plural } from '#nexitas/app/lib/format'
+import NotCounting from '../../../../components/NotCounting.vue'
 
 const project = useProject().id.value
 const route = useRoute()
@@ -59,19 +60,12 @@ const changingRange = computed(
 
 // Once the owner has dealt with refused beacons (fixed the settings, or knows why), they go;
 // refusals that come after show again.
-const clearing = ref(false)
-const clearError = ref('')
+const { pending: clearing, error: clearError, submit } = useSubmit()
 async function clearRefused() {
-  clearing.value = true
-  clearError.value = ''
-  try {
+  await submit(async () => {
     await $fetch(`/api/p/${project}/sites/refusals/clear`, { method: 'POST', body: {} })
     await refresh()
-  } catch (cause) {
-    clearError.value = errorMessage(cause)
-  } finally {
-    clearing.value = false
-  }
+  })
 }
 
 const share = (count: number, total: number) => (total ? count / total : 0)
@@ -81,13 +75,10 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
 <template>
   <AppPage
     title="Usage"
-    failed="Could not load this site."
+    failed="Could not load the usage."
     :error="counting ? error : undefined"
     :retry="refresh"
   >
-    <template v-if="data" #subtitle>
-      <span class="font-mono break-words">{{ data.origins.join(' · ') }}</span>
-    </template>
     <!-- Today first, then the range it sits in; the range's choice follows in the filters. -->
     <template v-if="data && counted.length" #lead>
       <AppLead :title="lead">
@@ -121,14 +112,11 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       />
     </template>
 
-    <p v-if="!counting" class="text-muted">
-      This project doesn't count its usage.
-      <NuxtLink :to="`/p/${project}`" class="link">Count usage</NuxtLink> on its page to start.
-    </p>
-    <p v-else-if="data && !counted.length" class="text-muted">
-      Nothing counted in the last {{ days }} days. The tracker to put in the site is under
-      <NuxtLink :to="`/p/${project}/sites/settings`" class="link">Settings</NuxtLink>.
-    </p>
+    <NotCounting v-if="!counting" />
+    <EmptyState v-else-if="data && !counted.length"
+      >Nothing counted in the last {{ days }} days. The tracker to put in the site is under
+      <NuxtLink :to="`/p/${project}/sites/settings`" class="link">Settings</NuxtLink>.</EmptyState
+    >
     <div
       v-if="data && counted.length"
       class="refetch stack gap-6"
@@ -158,17 +146,6 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         <template #title
           ><span class="font-mono">{{ event.name }}</span></template
         >
-        <template #actions>
-          <span class="cluster gap-2 text-muted tabular"
-            >{{ formatCount(event.total) }} in {{ days }} days
-            <span
-              v-if="formatDelta(event.total, event.previous)"
-              class="delta"
-              :data-trend="formatDelta(event.total, event.previous)!.trend"
-              >{{ formatDelta(event.total, event.previous)!.text }}</span
-            ></span
-          >
-        </template>
         <ColumnChart :name="event.name" :days="data.days" :daily="event.daily" />
         <!-- Each prop's values by how often they came along, as a share of the event. -->
         <DataTable v-for="prop in event.props" :key="prop.key" data-hover="false">
@@ -207,31 +184,30 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
          lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
     <!-- The id is the header's link to it; it lands on the section. -->
     <AppSection v-if="data?.refused.total" id="refused" title="Refused">
+      <!-- How many is the lead's to say: here, when, and where to fix it. -->
       <p class="text-s text-muted">
-        {{ plural(data.refused.total, 'event') }} in the last {{ days }} days, the latest on
-        {{ formatDay(data.refused.latest!) }}, sent something the
+        The latest on {{ formatDay(data.refused.latest!) }}. They sent something the
         <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't list,
-        and weren't counted.
+        so weren't counted.
       </p>
       <ul class="text-s">
         <li v-for="refusal in refusals" :key="refusal.reason">
           <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
         </li>
       </ul>
-      <AppAlert v-if="clearError" title="Could not clear them.">{{ clearError }}</AppAlert>
     </AppSection>
 
     <template v-if="data?.refused.total" #danger>
-      <span>Forgets the refusals for good, on every range; refusals after that show again.</span>
+      <span>Forgets the refusals counted so far.</span>
       <DangerAction
         label="Clear refusals"
         title="Clear the refusals?"
         :pending="clearing"
         @confirm="clearRefused"
       >
-        Forgets these refusals for good, on every range; refusals after that show again. This cannot
-        be undone.
+        On every range. Refusals after that show again. This cannot be undone.
       </DangerAction>
+      <AppAlert v-if="clearError" title="Could not clear them.">{{ clearError }}</AppAlert>
     </template>
   </AppPage>
 </template>

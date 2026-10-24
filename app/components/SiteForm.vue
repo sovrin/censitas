@@ -34,6 +34,18 @@ const events = ref<EventDraft[]>(
 
 const { pending, error, issues, fieldError, submit } = useSubmit()
 
+// A removed row takes the focus with it: it moves to the add button of the list it left.
+const addEvent = ref<HTMLButtonElement>()
+const addProp: Record<number, HTMLButtonElement | null> = {}
+function removeEvent(index: number) {
+  events.value.splice(index, 1)
+  addEvent.value?.focus()
+}
+function removeProp(event: EventDraft, index: number) {
+  event.props.splice(index, 1)
+  addProp[event.uid]?.focus()
+}
+
 /** The drafts as the site's events. A name or prop given twice would silently merge, so it is
  *  reported here instead. */
 function toEvents() {
@@ -75,13 +87,6 @@ async function save() {
 <template>
   <form class="stack gap-5" @submit.prevent="save">
     <fieldset :disabled="pending" class="stack gap-5">
-      <p class="text-s text-muted">
-        Sent from <span class="font-mono break-words">{{ site.origins.join(' · ') }}</span
-        >: the origins of
-        <NuxtLink :to="`/p/${site.projectId}`" class="link">its project</NuxtLink>, which every
-        module shares.
-      </p>
-
       <div class="stack gap-4">
         <!-- Named by the page's heading above the form. -->
         <small
@@ -117,7 +122,7 @@ async function save() {
                 data-variant="ghost"
                 :aria-label="`Remove event ${event.name || index + 1}`"
                 data-tip="Remove"
-                @click="events.splice(index, 1)"
+                @click="removeEvent(index)"
               >
                 <i class="icon" data-icon="x"></i>
               </button>
@@ -157,21 +162,26 @@ async function save() {
                   data-variant="ghost"
                   :aria-label="`Remove prop ${prop.key || propIndex + 1}`"
                   data-tip="Remove"
-                  @click="event.props.splice(propIndex, 1)"
+                  @click="removeProp(event, propIndex)"
                 >
                   <i class="icon" data-icon="x"></i>
                 </button>
               </div>
             </TransitionGroup>
             <p class="ps-5">
-              <button type="button" class="link text-s" @click="event.props.push(newProp())">
+              <button
+                :ref="(el) => (addProp[event.uid] = el as HTMLButtonElement | null)"
+                type="button"
+                class="link text-s"
+                @click="event.props.push(newProp())"
+              >
                 Add a prop
               </button>
             </p>
           </div>
         </TransitionGroup>
         <p>
-          <button type="button" class="link text-s" @click="events.push(newEvent())">
+          <button ref="addEvent" type="button" class="link text-s" @click="events.push(newEvent())">
             Add an event
           </button>
         </p>

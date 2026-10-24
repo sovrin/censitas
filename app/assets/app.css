@@ -92,6 +92,13 @@
   }
 }
 
+.chart-readout,
+.chart-dates > span {
+  /* Placed by the chart: --x along the plot, pulled back by --pull of its own width. */
+  inset-inline-start: calc(var(--x) * 100%);
+  translate: calc(var(--pull) * -100%) 0;
+}
+
 .chart-readout {
   position: absolute;
   inset-block-end: 100%;

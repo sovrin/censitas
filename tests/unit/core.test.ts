@@ -8,6 +8,7 @@ import {
   clearRefusals,
   countEvent,
   countRefusal,
+  countDays,
   countToday,
   siteReport,
 } from '../../server/core/counts'
@@ -92,7 +93,7 @@ describe('site settings', () => {
     const db = database()
     addSonotas(db)
     expect(censitas.projectStatus!(db, 'sonotas')).toEqual([
-      { text: 'nothing yet today', to: '/p/sonotas/sites', figure: '0' },
+      { text: 'nothing in 7 days', to: '/p/sonotas/sites' },
     ])
     expect(censitas.projectStatus!(db, 'other')).toEqual([])
     // Every owner route finds the site through its project, so another project finds none.
@@ -246,6 +247,8 @@ describe('counters', () => {
     ])
     expect(countToday(db, 'sonotas', NOW)).toBe(3)
     expect(countToday(db, 'other', NOW)).toBe(0)
+    expect(countDays(db, 'sonotas', 7, NOW)).toBe(4)
+    expect(countDays(db, 'sonotas', 1, NOW)).toBe(3)
   })
 
   it('report a range per day and by prop value, configured values at 0', () => {

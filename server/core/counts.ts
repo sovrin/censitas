@@ -78,6 +78,17 @@ export function countToday(db: DatabaseSync, site: string, now = Date.now()) {
   ).count
 }
 
+/** Every event a site counted over the last `days` days, today included. */
+export function countDays(db: DatabaseSync, site: string, days: number, now = Date.now()) {
+  return (
+    db
+      .prepare(
+        "SELECT coalesce(sum(count), 0) AS count FROM counts WHERE prop = '' AND day >= ? AND site = ?",
+      )
+      .get(dayOf(now - (days - 1) * 24 * 60 * 60 * 1000), site) as { count: number }
+  ).count
+}
+
 /** One site over the last `days` days: daily counts per event, the breakdown by prop value, and
  *  each event's total over the `days` before, to compare with. Configured events come first in
  *  their order, then any counted since dropped from the config. */

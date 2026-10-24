@@ -35,16 +35,17 @@ const dateTicks = computed(() => {
   const last = count.value - 1
   const step = Math.max(1, Math.ceil(last / 3))
   const indexes = [...new Set([last, last - step, last - 2 * step, 0].filter((i) => i >= 0))]
-  return indexes.map((index) => ({ index, day: points.value[index]!.day }))
+  return indexes.map((index) => ({ index, day: points.value[index]!.day, ...place(index) }))
 })
 
-/** Where a column's centre sits, and how a label above or below it is anchored so it stays
- *  inside the chart near the edges. */
+/** Where a label above or below a column sits (`x`, a share of the plot) and how much of its own
+ *  width it is pulled back (`pull`): centred on the column, but flush with the chart's edge near
+ *  it, so it stays inside. app.css reads both. */
 function place(index: number) {
   const at = (index + 0.5) / count.value
-  if (at < 0.15) return { insetInlineStart: '0' }
-  if (at > 0.85) return { insetInlineEnd: '0' }
-  return { insetInlineStart: `${at * 100}%`, translate: '-50% 0' }
+  if (at < 0.15) return { x: 0, pull: 0 }
+  if (at > 0.85) return { x: 1, pull: 1 }
+  return { x: at, pull: 0.5 }
 }
 
 const active = ref<number | null>(null)
@@ -73,7 +74,7 @@ const readout = computed(() => {
     value: formatCount(value),
     // Today's column is short because the day isn't over, not because nothing came.
     day: active.value === count.value - 1 ? 'today, so far' : formatDay(day, true),
-    style: place(active.value),
+    ...place(active.value),
   }
 })
 
@@ -114,20 +115,28 @@ const label = computed(
             :style="{ '--value': item.count / top, '--at': index / count }"
           ></span>
         </span>
-        <div v-if="readout" class="chart-readout" :style="readout.style" aria-live="polite">
+        <div
+          v-if="readout"
+          class="chart-readout"
+          :style="{ '--x': readout.x, '--pull': readout.pull }"
+          aria-live="polite"
+        >
           <b class="tabular">{{ readout.value }}</b>
           <span class="text-muted">{{ readout.day }}</span>
         </div>
       </div>
       <div class="chart-dates font-mono text-xs text-muted" aria-hidden="true">
-        <span v-for="tick in dateTicks" :key="tick.day" :style="place(tick.index)">{{
-          tick.index === count - 1 ? 'today' : formatDay(tick.day)
-        }}</span>
+        <span
+          v-for="tick in dateTicks"
+          :key="tick.day"
+          :style="{ '--x': tick.x, '--pull': tick.pull }"
+          >{{ tick.index === count - 1 ? 'today' : formatDay(tick.day) }}</span
+        >
       </div>
     </div>
     <details class="accordion text-s">
       <summary>Per day</summary>
-      <table class="table" data-size="s" data-hover="false">
+      <DataTable :label="`${name} per day`" data-hover="false">
         <thead>
           <tr>
             <th scope="col">Day (UTC)</th>
@@ -148,7 +157,7 @@ const label = computed(
             </td>
           </tr>
         </tbody>
-      </table>
+      </DataTable>
     </details>
   </figure>
 </template>

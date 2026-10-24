@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { ProjectSummary } from '#nexitas/shared/contracts'
 import type { ProjectUsage } from '../../../shared/contracts'
-import { errorMessage, plural } from '#nexitas/app/lib/format'
-import { trackerSnippet } from '../../lib/embed'
+import { errorMessage } from '#nexitas/app/lib/format'
+// Imported by path: a layer's new components are not always found by name in development.
+import TrackerCode from '../TrackerCode.vue'
 
-/** censitas' part of a project's page: whether it counts, today's figure, and its tracker. */
+/** censitas' part of a project's page: only its setup, the tracker and where its settings are.
+ *  What it counted is the sidebar's and the Usage page's to say. */
 const props = defineProps<{ project: ProjectSummary }>()
 const { data, error, refresh } = await useProjectFetch<ProjectUsage>('/sites')
-const origin = useRequestURL().origin
 
 async function start() {
   // The tracker counts a page view on import, so a site starts with that event alone.
@@ -24,19 +25,10 @@ async function start() {
   <div class="stack gap-3">
     <AppAlert v-if="error" title="Could not load its usage.">{{ errorMessage(error) }}</AppAlert>
     <template v-else-if="data?.site">
-      <p class="cluster gap-4">
-        <span class="tabular">{{
-          data.today ? `${plural(data.today, 'event')} today` : 'nothing yet today'
-        }}</span>
-        <NuxtLink :to="`/p/${project.id}/sites`" class="link">Dashboard</NuxtLink>
-        <NuxtLink :to="`/p/${project.id}/sites/settings`" class="link">Events</NuxtLink>
+      <TrackerCode :site="data.site.id" />
+      <p>
+        <NuxtLink :to="`/p/${project.id}/sites/settings`" class="link">Settings</NuxtLink>
       </p>
-      <EmbedCode :code="trackerSnippet(origin, data.site.id)" />
-      <small class="text-muted"
-        >Importing it counts a page view; call
-        <code class="font-mono">track('export-start', { resolution: '1080p' })</code> for the rest,
-        once its settings list them.</small
-      >
     </template>
     <PanelStart
       v-else-if="data"

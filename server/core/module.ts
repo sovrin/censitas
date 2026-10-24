@@ -2,7 +2,7 @@
 // project. The owner's sign-in, the /api guard and the database itself are the core's.
 import type { NexitasModule } from '#nexitas/shared/modules'
 import { formatCount, plural } from '#nexitas/app/lib/format'
-import { countToday } from './counts'
+import { countDays } from './counts'
 import { getProjectSite, removeSite } from './sites'
 
 export const censitas: NexitasModule = {
@@ -38,17 +38,18 @@ export const censitas: NexitasModule = {
   projectStatus: (db, projectId) => {
     const site = getProjectSite(db, projectId)
     if (!site) return []
-    const today = countToday(db, site.id)
+    // A week, not a day: a quiet site's day is mostly 0, which says nothing in the sidebar.
+    const week = countDays(db, site.id, 7)
     const to = `/p/${projectId}/sites`
     return [
-      today
+      week
         ? {
-            text: `${plural(today, 'event')} today`,
+            text: `${plural(week, 'event')} in 7 days`,
             to,
             tone: 'success',
-            figure: formatCount(today),
+            figure: formatCount(week),
           }
-        : { text: 'nothing yet today', to, figure: '0' },
+        : { text: 'nothing in 7 days', to },
     ]
   },
   deleteProject: (db, projectId) => {
