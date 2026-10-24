@@ -117,13 +117,14 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       >Nothing counted in the last {{ days }} days. The tracker to put in the site is under
       <NuxtLink :to="`/p/${project}/sites/settings`" class="link">Settings</NuxtLink>.</EmptyState
     >
+    <!-- Refused sits in the same rhythm as the charts, and dims with them while a range loads. -->
     <div
-      v-if="data && counted.length"
+      v-if="data && (counted.length || data.refused.total)"
       class="refetch stack gap-6"
       :data-pending="changingRange || undefined"
     >
       <!-- The figures of the range, each against the same number of days before it. -->
-      <div class="headline">
+      <div v-if="counted.length" class="headline">
         <div v-for="event in headline" :key="event.name" class="stat">
           <b>{{ formatCount(event.total) }}</b>
           <span class="cluster gap-2"
@@ -178,24 +179,24 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
           </tbody>
         </DataTable>
       </AppSection>
-    </div>
 
-    <!-- Refused beacons mean the site sends something its settings don't list: those events are
+      <!-- Refused beacons mean the site sends something its settings don't list: those events are
          lost until the settings catch up. Only the reason is known; what was sent is never kept. -->
-    <!-- The id is the header's link to it; it lands on the section. -->
-    <AppSection v-if="data?.refused.total" id="refused" title="Refused">
-      <!-- How many is the lead's to say: here, when, and where to fix it. -->
-      <p class="text-s text-muted">
-        The latest on {{ formatDay(data.refused.latest!) }}. They sent something the
-        <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't list,
-        so weren't counted.
-      </p>
-      <ul class="text-s">
-        <li v-for="refusal in refusals" :key="refusal.reason">
-          <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
-        </li>
-      </ul>
-    </AppSection>
+      <!-- The id is the header's link to it; it lands on the section. -->
+      <AppSection v-if="data?.refused.total" id="refused" title="Refused">
+        <!-- How many is the lead's to say: here, when, and where to fix it. -->
+        <p class="text-s text-muted">
+          The latest on {{ formatDay(data.refused.latest!) }}. They sent something the
+          <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't
+          list, so weren't counted.
+        </p>
+        <ul class="text-s">
+          <li v-for="refusal in refusals" :key="refusal.reason">
+            <span class="tabular">{{ formatCount(refusal.count) }}</span> {{ refusal.label }}
+          </li>
+        </ul>
+      </AppSection>
+    </div>
 
     <template v-if="data?.refused.total" #danger>
       <span>Forgets the refusals counted so far.</span>
