@@ -36,11 +36,11 @@ export const censitas: NexitasModule = {
   paths: ['/sites', '/api/sites'],
   // The counters' heartbeat: is anything arriving today?
   projectStatus: (db, projectId) => {
+    const to = `/p/${projectId}/sites`
     const site = getProjectSite(db, projectId)
-    if (!site) return []
+    if (!site) return [{ text: 'Not set up', to }]
     // A week, not a day: a quiet site's day is mostly 0, which says nothing in the sidebar.
     const week = countDays(db, site.id, 7)
-    const to = `/p/${projectId}/sites`
     return [
       week
         ? {

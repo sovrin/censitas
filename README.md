@@ -11,7 +11,7 @@ name and origins); censitas adds:
 
 - a tracker that a project's pages load by URL, and the public endpoint its beacons go to;
 - a usage page for each project: its daily counts and the share of each prop value;
-- a Usage panel on each project's page: start counting, today's figure, the tracker snippet.
+- its Setup beside the usage page: start counting, the tracker snippet, the events it counts.
 
 It stores only counters (site, UTC day, event, prop value, count) and nothing that could tell one
 visitor from another.
@@ -21,9 +21,8 @@ visitor from another.
 ```
 site (e.g. sonotas) ── GET  /v1/track.js?site=<id>  → the tracker; it counts a page view on import
                      ── POST /v1/e                   → one event, counted if its site allows it
-owner               ── /p/<id>                       a project's usage panel and tracker (nexitas)
-(signed in)         ── /p/<id>/sites                 the project's usage: daily counts, breakdowns
-                     ── /p/<id>/sites/settings        its events, the tracker, deleting
+owner               ── /p/<id>/sites                 the project's usage: daily counts, breakdowns
+(signed in)         ── /p/<id>/sites?setup           its setup: the tracker, its events, deleting
                      ── /api/p/<id>/sites/…           → the same, for the project's site only
                      ── GET  /api/events             → live: "something changed", every 3 s at most
 ```
@@ -110,10 +109,10 @@ A site is a nexitas project that counts: Count usage on the project's page start
 
 A beacon a site sends that its settings don't list is refused and lost, so censitas counts refusals
 per site and day by reason (an origin, event, prop or value not listed), never what was sent. The
-site page shows how many next to Settings, with the details at its end: update the settings when a
+usage page shows how many in its lead, with the details at its end: update the settings when a
 release starts sending something new, then Clear them; only refusals after that show again. A change
-applies from the next beacon on. The site's settings page shows the snippet to put in it.
-Delete counts (on the settings page) starts a site over from zero, after testing for example, and
+applies from the next beacon on. The page's Setup shows the snippet to put in it.
+Delete counts (in the Setup) starts a site over from zero, after testing for example, and
 keeps its settings and tracker; deleting the site deletes its counts with it.
 
 ## Abuse

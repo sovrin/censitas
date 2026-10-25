@@ -2,8 +2,7 @@
 import { trackerSnippet } from '../lib/embed'
 
 /** <TrackerCode :site="site.id" />
- *  The tracker a site puts in its code, and how to use it: said once, for the project's panel and
- *  the settings alike. */
+ *  The tracker a site puts in its code, and how to use it: the first thing Usage's setup shows. */
 defineProps<{ site: string }>()
 const origin = useRequestURL().origin
 </script>

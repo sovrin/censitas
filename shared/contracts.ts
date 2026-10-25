@@ -91,7 +91,7 @@ export interface SiteReport {
   events: EventReport[]
 }
 
-/** A project's usage, for its panel: its site, if it counts, and today's events. */
+/** A project's usage, for Usage's setup: its site, if it counts, and today's events. */
 export interface ProjectUsage {
   site: Site | null
   today: number

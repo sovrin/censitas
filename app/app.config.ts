@@ -1,5 +1,4 @@
-// censitas' part of the nexitas shell: its name and icon, its panel on each project, and its
-// section in the nav.
+// censitas' part of the nexitas shell: its name, icon and hue, and its section in the nav.
 export default defineAppConfig({
   nexitas: {
     modules: [
@@ -9,7 +8,6 @@ export default defineAppConfig({
         description: 'How your sites are used: event counts, nothing about visitors.',
         icon: 'bar-chart',
         accent: 'teal',
-        panel: 'CensitasProject',
       },
     ],
     nav: [{ to: '/sites', label: 'Usage', module: 'censitas' }],

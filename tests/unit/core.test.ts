@@ -95,7 +95,9 @@ describe('site settings', () => {
     expect(censitas.projectStatus!(db, 'sonotas')).toEqual([
       { text: 'nothing in 7 days', to: '/p/sonotas/sites' },
     ])
-    expect(censitas.projectStatus!(db, 'other')).toEqual([])
+    expect(censitas.projectStatus!(db, 'other')).toEqual([
+      { text: 'Not set up', to: '/p/other/sites' },
+    ])
     // Every owner route finds the site through its project, so another project finds none.
     expect(getProjectSite(db, 'sonotas')).toEqual(stored(sonotas))
     expect(getProjectSite(db, 'other')).toBeNull()

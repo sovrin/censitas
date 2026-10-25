@@ -8,8 +8,8 @@ project scoping, what the core gives a module, and the UI. What follows is censi
 
 - censitas registers itself in `server/core/module.ts`, its schema steps included. Each site counts
   for one nexitas project and takes its origins from it; censitas keeps only the site's events (and
-  its id, which the tracker names). Its panel on a project's page is
-  `app/components/global/CensitasProject.vue`.
+  its id, which the tracker names). It is started and set up on its own first page, Usage
+  (`app/pages/p/[project]/sites/index.vue`): the tracker and the events in its Setup.
 - Every rule about input lives once, in `shared/contracts.ts` (zod), and is checked at runtime on
   the server: a site's settings and each beacon. The dashboard's forms use the same schemas.
 - Privacy of counts: nothing that tells visitors apart is stored or logged: no IP address, user

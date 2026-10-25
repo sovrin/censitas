@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { RANGES, REFUSALS, type Refusal, type SiteReport } from '../../../../../shared/contracts'
+import {
+  RANGES,
+  REFUSALS,
+  type ProjectUsage,
+  type Refusal,
+  type SiteReport,
+} from '../../../../../shared/contracts'
 import { formatCount, formatDay, formatDelta, plural } from '#nexitas/app/lib/format'
-import NotCounting from '../../../../components/NotCounting.vue'
+import TrackerCode from '../../../../components/TrackerCode.vue'
 
 const project = useProject().id.value
 const route = useRoute()
@@ -13,8 +19,15 @@ const { data, error, refresh, status } = await useProjectFetch<SiteReport>('/sit
   query: { days },
 })
 
-/** No site: the project doesn't count, which is switched on on its page. */
-const counting = computed(() => error.value?.statusCode !== 404)
+// The site and its settings, for the setup; none until the project counts.
+const {
+  data: usage,
+  error: usageError,
+  refresh: refreshUsage,
+} = await useProjectFetch<ProjectUsage>('/sites')
+const site = computed(() => usage.value?.site)
+const counting = computed(() => !!site.value)
+const { open: setupOpen, openLink: setupLink, close: closeSetup } = useSetup()
 const counted = computed(() => data.value?.events.filter((event) => event.total) ?? [])
 /** Page views lead with the large chart; every other event follows with its own. */
 const views = computed(() => counted.value.find((event) => event.name === 'pageview'))
@@ -68,6 +81,40 @@ async function clearRefused() {
   })
 }
 
+async function start() {
+  // The tracker counts a page view on import, so a site starts with that event alone.
+  await $fetch(`/api/p/${project}/sites`, { method: 'POST', body: { events: { pageview: {} } } })
+  await Promise.all([refreshUsage(), refresh()])
+}
+
+const savedNotice = ref(false)
+async function saved() {
+  await refreshUsage()
+  savedNotice.value = true
+}
+
+// Two things can go, each behind typing the project's id: its counts alone, or the whole site.
+type Removal = 'counts' | 'site'
+const removal = ref<Removal>('counts')
+const { pending: removing, error: removeError, submit: submitRemoval } = useSubmit()
+const countsDeleted = ref(false)
+async function remove(next: Removal) {
+  removal.value = next
+  countsDeleted.value = false
+  await submitRemoval(async () => {
+    if (next === 'site') {
+      await $fetch(`/api/p/${project}/sites/delete`, { method: 'POST', body: {} })
+      // The project stays, with its other modules; this page offers to count again.
+      await navigateTo(closeSetup.value)
+      await refreshUsage()
+      return
+    }
+    await $fetch(`/api/p/${project}/sites/counts/delete`, { method: 'POST', body: {} })
+    await refresh()
+    countsDeleted.value = true
+  })
+}
+
 const share = (count: number, total: number) => (total ? count / total : 0)
 const percent = (value: number) => `${Math.round(value * 100)}%`
 </script>
@@ -76,11 +123,13 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
   <AppPage
     title="Usage"
     failed="Could not load the usage."
-    :error="counting ? error : undefined"
-    :retry="refresh"
+    :error="usageError ?? (counting ? error : undefined)"
+    :retry="usageError ? refreshUsage : refresh"
+    aside-title="Setup"
+    :aside-close="setupOpen ? closeSetup : undefined"
   >
     <!-- Today first, then the range it sits in; the range's choice follows in the filters. -->
-    <template v-if="data && counted.length" #lead>
+    <template v-if="counting && data && counted.length" #lead>
       <AppLead :title="lead">
         <template #meta
           >{{ formatCount(total) }} in {{ days }} days<template v-if="delta">
@@ -97,7 +146,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       </AppLead>
     </template>
     <template v-if="counting" #actions>
-      <NuxtLink :to="`/p/${project}/sites/settings`" class="btn" data-size="s">Settings</NuxtLink>
+      <SetupLink />
     </template>
     <template v-if="counting" #filters>
       <FilterLinks
@@ -112,14 +161,21 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       />
     </template>
 
-    <NotCounting v-if="!counting" />
+    <ModuleStart
+      v-if="usage && !counting"
+      label="Count usage"
+      failed="Could not start counting."
+      :start="start"
+    >
+      Counts what happens on its pages, never who: no cookie, no identifier, no consent banner.
+    </ModuleStart>
     <EmptyState v-else-if="data && !counted.length"
       >Nothing counted in the last {{ days }} days. The tracker to put in the site is under
-      <NuxtLink :to="`/p/${project}/sites/settings`" class="link">Settings</NuxtLink>.</EmptyState
+      <NuxtLink :to="setupLink" class="link">Setup</NuxtLink>.</EmptyState
     >
     <!-- Refused sits in the same rhythm as the charts, and dims with them while a range loads. -->
     <div
-      v-if="data && (counted.length || data.refused.total)"
+      v-if="counting && data && (counted.length || data.refused.total)"
       class="refetch stack gap-6"
       :data-pending="changingRange || undefined"
     >
@@ -187,8 +243,7 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
         <!-- How many is the lead's to say: here, when, and where to fix it. -->
         <p class="text-s text-muted">
           The latest on {{ formatDay(data.refused.latest!) }}. They sent something the
-          <NuxtLink :to="`/p/${project}/sites/settings`" class="link">settings</NuxtLink> don't
-          list, so weren't counted.
+          <NuxtLink :to="setupLink" class="link">settings</NuxtLink> don't list, so weren't counted.
         </p>
         <ul class="text-s">
           <li v-for="refusal in refusals" :key="refusal.reason">
@@ -198,7 +253,46 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
       </AppSection>
     </div>
 
-    <template v-if="data?.refused.total" #danger>
+    <!-- Everything to connect a site, then what it may send. -->
+    <template v-if="site && setupOpen" #aside>
+      <AppAlert v-if="countsDeleted" tone="success" title="Counts deleted."
+        ><span class="font-mono">{{ project }}</span> counts again from zero.</AppAlert
+      >
+      <TrackerCode :site="site.id" />
+      <AppSection title="Events">
+        <AppAlert v-if="savedNotice" tone="success" title="Saved." />
+        <SiteForm :key="JSON.stringify(site)" :site="site" @saved="saved" />
+      </AppSection>
+    </template>
+    <template v-if="site && setupOpen" #danger>
+      <span>Its counts, or its counts and settings; the project stays.</span>
+      <DangerAction
+        label="Delete counts"
+        :title="`Delete everything ${project} counted?`"
+        :confirm-word="project"
+        :pending="removing"
+        @confirm="remove('counts')"
+      >
+        To start over, after testing for example: its refusals go too; its settings and the tracker
+        stay, and it counts again from zero. This cannot be undone.
+      </DangerAction>
+      <DangerAction
+        label="Stop counting"
+        :title="`Stop counting ${project}?`"
+        :confirm-word="project"
+        :pending="removing"
+        @confirm="remove('site')"
+      >
+        The tracker in its pages is refused from then on. Counting again later starts from zero.
+        This cannot be undone.
+      </DangerAction>
+      <AppAlert
+        v-if="removeError"
+        :title="removal === 'site' ? 'Could not stop counting.' : 'Could not delete the counts.'"
+        >{{ removeError }}</AppAlert
+      >
+    </template>
+    <template v-else-if="counting && data?.refused.total" #danger>
       <span>Forgets the refusals counted so far.</span>
       <DangerAction
         label="Clear refusals"
