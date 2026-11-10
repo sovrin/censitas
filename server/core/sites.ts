@@ -1,7 +1,7 @@
 // The sites censitas counts for, one per project, and what each one may send. Who may send is the
 // project's: its origins, which every module of the project shares.
 import type { DatabaseSync } from 'node:sqlite'
-import { beaconSchema, type Refusal, type Site, type SiteConfig } from '../../shared/contracts'
+import { beaconSchema, type Refusal, type Site, type SiteConfig } from '#self/shared/contracts'
 import { transaction } from '#nexitas/server/core/database'
 
 interface SiteRow {

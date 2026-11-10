@@ -6,7 +6,7 @@ import {
   type Refusal,
   type SiteConfig,
   type SiteReport,
-} from '../../shared/contracts'
+} from '#self/shared/contracts'
 import { transaction } from '#nexitas/server/core/database'
 
 const DAY = 24 * 60 * 60 * 1000

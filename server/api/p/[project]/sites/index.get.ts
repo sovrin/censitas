@@ -1,6 +1,6 @@
-import type { ProjectUsage } from '../../../../../shared/contracts'
-import { countToday } from '../../../../core/counts'
-import { getProjectSite } from '../../../../core/sites'
+import type { ProjectUsage } from '#self/shared/contracts'
+import { countToday } from '#self/server/core/counts'
+import { getProjectSite } from '#self/server/core/sites'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
 import { requestProject } from '#nexitas/server/utils/projects'
 

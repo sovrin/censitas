@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
-import { siteSettingsSchema, type SiteConfig } from '../../shared/contracts'
+import { siteSettingsSchema, type SiteConfig } from '#self/shared/contracts'
 import {
   clearRefusals,
   countEvent,
@@ -11,11 +11,11 @@ import {
   countDays,
   countToday,
   siteReport,
-} from '../../server/core/counts'
+} from '#self/server/core/counts'
 import { openDatabase } from '#nexitas/server/core/database'
 import { createProject, deleteProject } from '#nexitas/server/core/projects'
-import { isBot } from '../../server/core/limits'
-import { censitas } from '../../server/core/module'
+import { isBot } from '#self/server/core/limits'
+import { censitas } from '#self/server/core/module'
 import {
   acceptBeacon,
   createSite,
@@ -24,7 +24,7 @@ import {
   getProjectSite,
   getSite,
   updateSite,
-} from '../../server/core/sites'
+} from '#self/server/core/sites'
 
 const DAY = 24 * 60 * 60 * 1000
 const NOW = Date.UTC(2026, 9, 19, 12)

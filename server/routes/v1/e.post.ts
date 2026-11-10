@@ -1,9 +1,9 @@
 import { createLimiter } from '#nexitas/server/core/limits'
 import { nexitasDatabase, requestSender } from '#nexitas/server/utils/nexitas'
-import { countEvent, countRefusal } from '../../core/counts'
-import { isBot } from '../../core/limits'
-import { acceptBeacon, getSite } from '../../core/sites'
-import { announceBeacon } from '../../utils/censitas'
+import { countEvent, countRefusal } from '#self/server/core/counts'
+import { isBot } from '#self/server/core/limits'
+import { acceptBeacon, getSite } from '#self/server/core/sites'
+import { announceBeacon } from '#self/server/utils/censitas'
 
 // A visitor sends a page view and a handful of events; a script sending more is not one.
 const perSender = createLimiter(60, 60 * 1000)

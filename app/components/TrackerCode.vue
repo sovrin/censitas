@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { trackerSnippet } from '../lib/embed'
+import { trackerSnippet } from '#self/app/lib/embed'
 
 /** <TrackerCode :site="site.id" />
  *  The tracker a site puts in its code, and how to use it: the first thing Usage's setup shows. */

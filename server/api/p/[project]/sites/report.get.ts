@@ -1,7 +1,7 @@
-import { RANGES } from '../../../../../shared/contracts'
-import { siteReport } from '../../../../core/counts'
+import { RANGES } from '#self/shared/contracts'
+import { siteReport } from '#self/server/core/counts'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { projectSite } from '../../../../utils/censitas'
+import { projectSite } from '#self/server/utils/censitas'
 
 export default defineEventHandler((event) => {
   const site = projectSite(event)
