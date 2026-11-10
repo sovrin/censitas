@@ -5,9 +5,9 @@ import {
   type ProjectUsage,
   type Refusal,
   type SiteReport,
-} from '../../../../../shared/contracts'
+} from '#self/shared/contracts'
 import { formatCount, formatDay, formatDelta, plural } from '#nexitas/app/lib/format'
-import TrackerCode from '../../../../components/TrackerCode.vue'
+import TrackerCode from '#self/app/components/TrackerCode.vue'
 
 const project = useProject().id.value
 const route = useRoute()

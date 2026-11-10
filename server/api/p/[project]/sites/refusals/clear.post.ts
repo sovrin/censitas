@@ -1,6 +1,6 @@
-import { clearRefusals } from '../../../../../core/counts'
+import { clearRefusals } from '#self/server/core/counts'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { projectSite } from '../../../../../utils/censitas'
+import { projectSite } from '#self/server/utils/censitas'
 import { announceChange } from '#nexitas/server/utils/changes'
 
 /** The owner has dealt with the refused beacons: forget them, so only new ones show. */

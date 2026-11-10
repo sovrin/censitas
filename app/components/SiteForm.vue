@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FieldIssue } from '#nexitas/shared/contracts'
-import type { Site } from '../../shared/contracts'
+import type { Site } from '#self/shared/contracts'
 
 /** Changes a site: every event, prop and value that is counted. Nothing else is: a beacon with
  *  anything not listed here is refused. Who may send is its project's origins, set there. */

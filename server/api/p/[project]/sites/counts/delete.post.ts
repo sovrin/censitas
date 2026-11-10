@@ -1,6 +1,6 @@
-import { deleteCounts } from '../../../../../core/sites'
+import { deleteCounts } from '#self/server/core/sites'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { projectSite } from '../../../../../utils/censitas'
+import { projectSite } from '#self/server/utils/censitas'
 import { announceChange } from '#nexitas/server/utils/changes'
 
 /** Deletes everything the site counted and refused; its settings and tracker stay. */
