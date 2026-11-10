@@ -1,7 +1,7 @@
-import { siteSettingsSchema } from '../../../../../shared/contracts'
-import { getSite, updateSite } from '../../../../core/sites'
+import { siteSettingsSchema } from '#self/shared/contracts'
+import { getSite, updateSite } from '#self/server/core/sites'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
-import { projectSite } from '../../../../utils/censitas'
+import { projectSite } from '#self/server/utils/censitas'
 import { announceChange } from '#nexitas/server/utils/changes'
 import { invalid } from '#nexitas/server/utils/invalid'
 

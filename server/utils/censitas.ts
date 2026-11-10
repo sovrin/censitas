@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import { pacedAnnouncer } from '#nexitas/server/utils/changes'
 import { nexitasDatabase } from '#nexitas/server/utils/nexitas'
 import { requestProject } from '#nexitas/server/utils/projects'
-import { getProjectSite } from '../core/sites'
+import { getProjectSite } from '#self/server/core/sites'
 
 /** The site of the request's project, or a 404 when the project doesn't count. */
 export function projectSite(event: H3Event) {
